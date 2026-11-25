@@ -13,7 +13,7 @@
    ```
 
    Para empleados adicionales usa `cashier` o `kitchen`. Desactiva el acceso cambiando `active` a `false` en `public.staff`. Las políticas y funciones comprueban este campo durante las operaciones.
-5. Carga el logo oficial y las fotos comerciales en un bucket público de Supabase Storage para imágenes del menú, o usa un alojamiento de imágenes del negocio. Restringe las escrituras del bucket al propietario y limita los tipos y tamaños a archivos de imagen. En administración, pega las URL públicas. La portada usa una fotografía generada de cachapa hasta que se configure la foto propia. No se incluyen precios, datos de contacto ni productos de muestra.
+5. En **Ajustes**, selecciona archivos para el logo y la portada. En **Menú**, agrega la foto desde el formulario del producto. Puedes cargar JPG, PNG, WebP o AVIF de hasta 5 MB. Si ya aplicaste las dos primeras migraciones, ejecuta únicamente `202611250003_catalog_images.sql` en el SQL Editor del proyecto QCACHAPA. Esta migración crea el bucket público de imágenes y reserva las escrituras a administradores activos. Los archivos se publican al guardar el formulario.
 6. Crea categorías y productos reales antes de habilitar pedidos web. Completa el flujo de validación con cuentas distintas de caja y cocina antes de abrirlo al público.
 
 ## Netlify

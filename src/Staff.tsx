@@ -1,13 +1,13 @@
-import {lazy,Suspense,useEffect,useState,type FormEvent,type ReactNode} from 'react';
+import {lazy,Suspense,useEffect,useState,type FormEvent,type MouseEvent,type ReactNode} from 'react';
 import {type Session} from '@supabase/supabase-js';
 import {useCatalog,useOnline,type Catalog} from './data';
 import {db, type Business, type Role} from './model';
 import {Cashier,Kitchen} from './Operations';
 import Brand from './Brand';
+import {isAdminView,isCashierView,staffNavigation,staffRoute,staffRoutes,type StaffRoute} from './staffRoutes';
 import './staff.css';
 
 const Admin = lazy(() => import('./Admin'));
-const panels = {admin:'Administración',cashier:'Caja',kitchen:'Cocina'};
 
 function AccessFrame({business,children}:{business:Business;children:ReactNode}) {
   return <main className="staff staff-access">
@@ -80,7 +80,7 @@ export default function Staff() {
   const online = useOnline();
   const [session,setSession] = useState<Session|null|undefined>(undefined);
   const [role,setRole] = useState<Role|null|undefined>();
-  const [panel,setPanel] = useState<Role>('admin');
+  const [path,setPath] = useState(location.pathname);
   const [recovery,setRecovery] = useState(false);
   const [message,setMessage] = useState('');
   useEffect(() => {
@@ -100,12 +100,35 @@ export default function Staff() {
       if (!active) return;
       const next = (data?.role as Role|undefined) ?? null;
       setRole(next);
-      setPanel(next ?? 'admin');
       setMessage(error ? 'No se pudieron consultar los permisos.' : '');
       void catalog.refresh();
     });
     return () => {active = false;};
   },[user,catalog.refresh]);
+
+  useEffect(() => {
+    const sync = () => setPath(location.pathname);
+    window.addEventListener('popstate',sync);
+    return () => window.removeEventListener('popstate',sync);
+  },[]);
+
+  const section = role ? staffRoute(role,path) : null;
+  useEffect(() => {
+    if (!section || recovery || path === staffRoutes[section].path) return;
+    const canonical = staffRoutes[section].path;
+    history.replaceState(null,'',canonical + location.search + location.hash);
+    setPath(canonical);
+  },[path,recovery,section]);
+
+  function navigate(route:StaffRoute, event?:MouseEvent<HTMLAnchorElement>) {
+    if (event && (event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey)) return;
+    event?.preventDefault();
+    const next = staffRoutes[route].path;
+    if (next === path) return;
+    history.pushState(null,'',next);
+    setPath(next);
+    window.scrollTo({top:0,behavior:'instant'});
+  }
 
   if (recovery) return <AccessFrame business={catalog.business}>
     <h1>Nueva contraseña</h1>
@@ -130,11 +153,6 @@ export default function Staff() {
     <header className="staff-header">
       <div className="shell staff-header-inner">
         <Brand className="staff-brand" business={catalog.business}/>
-        {role === 'admin' && <nav className="staff-panels" aria-label="Paneles">
-          {(Object.keys(panels) as Role[]).map(item =>
-            <button key={item} type="button" aria-pressed={panel === item} onClick={() => setPanel(item)}>{panels[item]}</button>
-          )}
-        </nav>}
         <div className="staff-utilities">
           <span role="status" className={'staff-connection ' + (online ? 'online' : 'offline')}>
             <span aria-hidden="true"/>{online ? 'En línea' : 'Sin conexión'}
@@ -146,15 +164,22 @@ export default function Staff() {
         </div>
       </div>
     </header>
-    <main className="shell workspace">
-      {role === null ? <p role="alert" className="notice">{message || 'Tu cuenta no tiene un perfil activo de personal.'}</p> : <>
-        {message && <p role="alert" className="notice">{message}</p>}
-        <Suspense fallback={<p role="status">Cargando panel…</p>}>
-          {panel === 'admin' && <Admin catalog={catalog} user={session.user.id}/>}
-          {panel === 'cashier' && <Cashier catalog={catalog} user={session.user.id} admin={role === 'admin'}/>}
-          {panel === 'kitchen' && <Kitchen timezone={catalog.business.timezone}/>}
-        </Suspense>
-      </>}
-    </main>
+    <div className="shell staff-frame">
+      {role && <nav className="staff-sidebar" aria-label="Panel de trabajo">
+        {staffNavigation(role).map(item => <a key={item} href={staffRoutes[item].path}
+          aria-current={section === item || (section === 'manual' && item === 'orders') ? 'page' : undefined}
+          onClick={event => navigate(item,event)}>{staffRoutes[item].label}</a>)}
+      </nav>}
+      <main className="workspace staff-workspace">
+        {role === null ? <p role="alert" className="notice">{message || 'Tu cuenta no tiene un perfil activo de personal.'}</p> : <>
+          {message && <p role="alert" className="notice">{message}</p>}
+          <Suspense fallback={<p role="status">Cargando panel…</p>}>
+            {section && isAdminView(section) && <Admin catalog={catalog} user={session.user.id} section={section}/>}
+            {section && isCashierView(section) && <Cashier catalog={catalog} user={session.user.id} admin={role === 'admin'} view={section} navigate={navigate}/>}
+            {section === 'kitchen' && <Kitchen timezone={catalog.business.timezone}/>}
+          </Suspense>
+        </>}
+      </main>
+    </div>
   </div>;
 }

@@ -223,3 +223,30 @@ html:has(.portal-cart[open]) { overflow: hidden; }
   .portal .portal-primary span, .portal .product { transition: none; }
   .portal .store-cart-button > span > span, .portal-cart[open], .portal-cart[open]::backdrop { animation: none; }
 }
+
+.portal .store .section-head { border-bottom: 0; }
+.portal .menu-controls input { border-color: transparent; background: #efe8d4; }
+.portal .store .empty { border: 0; border-radius: 12px; }
+.portal .product {
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px #27291a0d;
+  animation: storefront-item-in .32s ease both;
+}
+.portal .product img { transition: transform .3s ease; }
+@media(hover:hover) and (pointer:fine) {
+  .portal .product:hover img { transform: scale(1.035); }
+}
+@keyframes storefront-item-in { from { opacity: .35; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@media(prefers-reduced-motion: reduce) {
+  .portal .product { animation: none; }
+  .portal .product img { transition: none; }
+  .portal .product:hover img { transform: none; }
+}
+
+.checkout-page .masthead { grid-template-columns: 1fr auto; }
+.checkout-page .masthead > a:last-child { display: flex; min-height: 44px; align-items: center; font-weight: 650; }
+.checkout-page main.shell { width: min(650px,calc(100% - 2rem)); padding-block: clamp(2rem,5vw,4rem); }
+.checkout-page h1 { font: 800 clamp(2.65rem,6vw,4.3rem)/1 'Barlow Condensed',sans-serif; margin-bottom: 1.1rem; }
+.checkout-basket { border: 0; border-radius: 18px; }
+.checkout-basket .cart-heading { margin-bottom: .85rem; }

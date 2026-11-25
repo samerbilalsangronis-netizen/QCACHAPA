@@ -6,7 +6,8 @@ type CartLine = {product_id:string; quantity:number; notes:string};
 type Draft = {key:string; lines:CartLine[]};
 const newDraft = ():Draft => ({key:crypto.randomUUID(),lines:[]});
 
-export function Store({catalog,source='web',onPlaced,cartDialog}:{catalog:Catalog; source?:'web'|'pos'; onPlaced?:()=>void; cartDialog?:RefObject<HTMLDialogElement|null>}) {
+export function Store({catalog,source='web',onPlaced,cartDialog,checkout=false}:{catalog:Catalog; source?:'web'|'pos'; onPlaced?:()=>void; cartDialog?:RefObject<HTMLDialogElement|null>; checkout?:boolean}) {
+  const canConfirm = !catalog.loading && !catalog.error;
   const storage = 'qc-cart-' + source;
   const {categories,products,business} = catalog;
   const [draft,setDraft] = useState(() => source === 'web' ? readStored(storage,newDraft()) : newDraft());
@@ -38,7 +39,7 @@ export function Store({catalog,source='web',onPlaced,cartDialog}:{catalog:Catalo
 
   async function place(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (sending.current) return;
+    if (sending.current || !count || hasUnavailable || (source === 'web' && (!canConfirm || !business.accepting_orders || !checkout))) return;
     sending.current = true;
     setBusy(true);
     setError('');
@@ -71,13 +72,14 @@ export function Store({catalog,source='web',onPlaced,cartDialog}:{catalog:Catalo
     else cart.current?.scrollIntoView();
   }
 
+  const BasketHeading = checkout ? 'h2' : 'h3';
   const basket = <>
     <div className="row cart-heading">
-      <h3 id={cartDialog ? 'portal-cart-title' : undefined}>Tu pedido <span>{count}</span></h3>
+      <BasketHeading id={cartDialog ? 'portal-cart-title' : undefined}>Tu pedido <span>{count}</span></BasketHeading>
       {cartDialog && <button type="button" className="cart-close secondary" aria-label="Cerrar pedido" onClick={() => cartDialog.current?.close()}>×</button>}
     </div>
     {!count ? <div className="cart-empty">
-      <p className="muted">Aquí aparecerán los productos que elijas.</p>
+      <p className="muted">{checkout ? 'Agrega productos al menú para hacer un pedido.' : 'Aquí aparecerán los productos que elijas.'}</p>
       {cartDialog && <button type="button" className="secondary" onClick={() => {
         cartDialog.current?.close();
         document.getElementById('menu')?.focus();
@@ -90,8 +92,8 @@ export function Store({catalog,source='web',onPlaced,cartDialog}:{catalog:Catalo
             return <div className="cart-line" key={index}>
               <div className="row"><strong>{product?.name ?? 'Producto no disponible'}</strong>
                 <button type="button" className="text-button" onClick={() => update(draft.lines.filter((_,i) => i !== index))}>Quitar</button></div>
-              {!product?.available && <p className="notice">Agotado. Quita este producto para continuar.</p>}
-            <label>Cantidad<input type="number" min={1} max={99} value={line.quantity} onChange={e => {
+              {!catalog.loading && !catalog.error && !product?.available && <p className="notice">Agotado. Quita este producto para continuar.</p>}
+              <label>Cantidad<input type="number" min={1} max={99} value={line.quantity} onChange={e => {
                 const value = e.target.valueAsNumber;
                 if (Number.isInteger(value) && value >= 1 && value <= 99) update(draft.lines.map((item,i) => i === index ? {...item,quantity:value} : item));
               }}/></label>
@@ -99,16 +101,29 @@ export function Store({catalog,source='web',onPlaced,cartDialog}:{catalog:Catalo
             </div>;
           })}
           <div className="row total"><span>Total estimado</span><strong>{money(total)}</strong></div>
-          <label>Modalidad<select value={mode} onChange={e => setMode(e.target.value)}><option value="pickup">Retiro en local</option><option value="table">Consumo en mesa</option></select></label>
-          {mode === 'table' && <label>Mesa<input name="table" required maxLength={40}/></label>}
-          <label>Nombre<input name="customer" required maxLength={100} autoComplete="name"/></label>
-          <label>Teléfono (opcional)<input name="phone" type="tel" maxLength={40} autoComplete="tel"/></label>
-          <label>Observaciones del pedido<textarea name="notes" maxLength={500}/></label>
-          {error && <p className="notice" role="alert">{error}</p>}
-          <button disabled={hasUnavailable || (source === 'web' && !business.accepting_orders)}>{busy ? 'Registrando…' : 'Confirmar pedido'}</button>
+          {source === 'web' && !checkout ? (
+            hasUnavailable || !canConfirm || !business.accepting_orders
+              ? <p className="notice">Revisa la disponibilidad para continuar.</p>
+              : <a className="button" href="/checkout/">Continuar al pedido</a>
+          ) : <>
+            <label>Modalidad<select value={mode} onChange={e => setMode(e.target.value)}><option value="pickup">Retiro en local</option><option value="table">Consumo en mesa</option></select></label>
+            {mode === 'table' && <label>Mesa<input name="table" required maxLength={40}/></label>}
+            <label>Nombre<input name="customer" required maxLength={100} autoComplete="name"/></label>
+            <label>Teléfono (opcional)<input name="phone" type="tel" maxLength={40} autoComplete="tel"/></label>
+            <label>Observaciones del pedido<textarea name="notes" maxLength={500}/></label>
+            {error && <p className="notice" role="alert">{error}</p>}
+            <button disabled={hasUnavailable || (source === 'web' && (!canConfirm || !business.accepting_orders))}>{busy ? 'Registrando…' : 'Confirmar pedido'}</button>
+          </>}
         </fieldset>
       </form>}
   </>;
+
+  if (checkout) return <section className="panel checkout-basket" aria-label="Detalles del pedido">
+    {catalog.loading && <p role="status">Comprobando el menú…</p>}
+    {catalog.error && <p role="alert" className="notice">No se pudo comprobar la disponibilidad. Intenta recargar.</p>}
+    {canConfirm && !business.accepting_orders && <p className="notice">Los pedidos en línea están cerrados.</p>}
+    {basket}
+  </section>;
 
   return <section id="menu" className="store shell" tabIndex={source === 'web' ? -1 : undefined}>
     <div className="section-head">

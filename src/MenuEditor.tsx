@@ -1,6 +1,8 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import type {Catalog} from './data';
 import {db,money,type Category,type Product} from './model';
+import ImagePicker from './ImagePicker';
+import {saveCatalogImages} from './catalogImages';
 import './menu-editor.css';
 
 type Editor =
@@ -92,11 +94,13 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
       price:Number(data.get('price')),
       prep_minutes:Number(data.get('prep_minutes')),
       description:String(data.get('description') ?? '').trim(),
-      image_url:String(data.get('image_url') ?? '').trim() || null,
       available:data.get('available') === 'on',
     };
-    void save(() => (id ? source.from('products').update(row).eq('id',id) : source.from('products').insert(row))
-      .select('id').single(),id ? 'Producto actualizado.' : 'Producto creado.', true);
+    void save(() => saveCatalogImages(source,data,['image_url'],images => {
+      const changes = {...row,...images};
+      return (id ? source.from('products').update(changes).eq('id',id) : source.from('products').insert(changes))
+        .select('id').single();
+    }),id ? 'Producto actualizado.' : 'Producto creado.', true);
   }
 
   const title = editor?.kind === 'product' ? (editor.item ? 'Editar producto' : 'Nuevo producto')
@@ -140,7 +144,7 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
             </select>
           </div>
         </div>
-        {catalog.loading ? <p role="status" className="empty">Cargando productos…</p> : visible.length > 0 ? <ul className="menu-product-rows">
+        {catalog.loading ? <p role="status" className="empty">Cargando productos…</p> : visible.length > 0 ? <ul className="menu-product-rows" key={selected+availability}>
           {visible.map(item => <li className="panel menu-product-row" key={item.id}>
             {item.image_url ? <img src={item.image_url} alt="" width={56} height={56} loading="lazy"/> : <div className="menu-product-initial" aria-hidden="true">{item.name.slice(0,1)}</div>}
             <div className="menu-product-meta">
@@ -181,7 +185,7 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
               <label>Precio en USD<input type="number" name="price" min="0" max="9999999999.99" step=".01" defaultValue={editor.item?.price} required/></label>
               <label>Preparación en minutos<input type="number" name="prep_minutes" min="1" max="1440" defaultValue={editor.item?.prep_minutes ?? 20} required/></label>
             </div>
-            <label>Foto (URL)<input type="url" name="image_url" defaultValue={editor.item?.image_url ?? ''}/></label>
+            <ImagePicker name="image_url" label="Foto del producto" current={editor.item?.image_url}/>
             <label>Descripción<textarea name="description" defaultValue={editor.item?.description} maxLength={2000}/></label>
             <label className="check"><input name="available" type="checkbox" defaultChecked={editor.item?.available ?? true}/> Disponible para pedidos</label>
           </>}

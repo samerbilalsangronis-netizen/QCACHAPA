@@ -30,7 +30,7 @@ button, .button {
 button:hover:not(:disabled), .button:hover { filter: brightness(.92); }
 button:disabled { cursor: not-allowed; opacity: .55; }
 :focus-visible { outline: 3px solid #a4541b; outline-offset: 3px; }
-.secondary, .chips button, .admin-nav button { color: var(--ink); background: var(--paper); border-color: var(--line); }
+.secondary, .chips button { color: var(--ink); background: var(--paper); border-color: var(--line); }
 .text-button { color: var(--rust); background: transparent; padding-inline: .35rem; }
 input, select, textarea {
   border: 1px solid #d8c7b6; border-radius: 8px; padding: .65rem .75rem;
@@ -92,9 +92,6 @@ button[aria-pressed=true] { background: #3b2418; color: white; border-color: #3b
 .ticket button { width: 100%; }
 .kitchen:fullscreen { background: #fff9ed; padding: 1.2rem; overflow: auto; }
 .order.ready { border-color: #829858; }
-.admin-layout { display: grid; grid-template-columns: 155px minmax(0,1fr); gap: 1.4rem; }
-.admin-layout h1 { margin-bottom: 1rem; }
-.admin-nav { display: grid; align-content: start; gap: .45rem; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,200px),1fr)); gap: .65rem; }
 .metric strong { font-size: 1.5rem; }
 .calendar-wrap { overflow-x: auto; margin-top: .85rem; }
@@ -112,9 +109,8 @@ button[aria-pressed=true] { background: #3b2418; color: white; border-color: #3b
   .masthead { min-height: 72px; }
   .masthead nav a:not(.button) { display: none; }
   .store { padding-block: 1.8rem 2.5rem; }
-  .store-grid, .admin-layout { grid-template-columns: 1fr; }
+  .store-grid { grid-template-columns: 1fr; }
   .cart { position: static; }
-  .admin-nav { display: flex; flex-wrap: wrap; }
   .footer .row { align-items: start; }
 }
 @media(prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

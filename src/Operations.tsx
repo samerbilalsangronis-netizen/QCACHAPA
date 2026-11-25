@@ -1,7 +1,8 @@
-import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
+import {useCallback,useEffect,useRef,useState,type FormEvent,type MouseEvent} from 'react';
 import {Store} from './Store';
 import {useOnline,type Catalog} from './data';
 import {db,labels,money,rpc,time,type Order,type Shift,type Ticket} from './model';
+import {staffRoutes,type CashierView} from './staffRoutes';
 
 const client = () => db!;
 
@@ -21,7 +22,23 @@ function useActions(refresh:()=>Promise<void>) {
   return {notice,busy,run};
 }
 
-export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:boolean}) {
+const orderFilters = [
+  {id:'all',label:'Todos',matches:(_order:Order,_paid:boolean) => true},
+  {id:'received',label:'Nuevos',matches:(order:Order) => order.status === 'received'},
+  {id:'preparing',label:'En cocina',matches:(order:Order) => ['confirmed','preparing'].includes(order.status)},
+  {id:'ready',label:'Listos',matches:(order:Order) => order.status === 'ready'},
+  {id:'pending',label:'Por cobrar',matches:(order:Order,paid:boolean) => !paid && order.status !== 'cancelled'},
+  {id:'delivered',label:'Entregados',matches:(order:Order) => order.status === 'delivered'},
+  {id:'cancelled',label:'Cancelados',matches:(order:Order) => order.status === 'cancelled'},
+] as const;
+
+export function Cashier({catalog,user,admin,view,navigate}:{
+  catalog:Catalog;user:string;admin:boolean;view:CashierView;
+  navigate:(route:CashierView,event?:MouseEvent<HTMLAnchorElement>)=>void;
+}) {
+  const [filter,setFilter] = useState<(typeof orderFilters)[number]['id']>('all');
+  const [search,setSearch] = useState('');
+  const [loading,setLoading] = useState(true);
   const [orders,setOrders] = useState<Order[]>([]);
   const [paid,setPaid] = useState<Set<string>>(new Set());
   const [shifts,setShifts] = useState<Shift[]>([]);
@@ -43,6 +60,7 @@ export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:
       setOrders(sales.data);
     }
     if (turns.data) setShifts(turns.data);
+    setLoading(false);
   },[user]);
   useEffect(() => {
     void refresh();
@@ -61,11 +79,25 @@ export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:
   const opened = shifts.find(shift => !shift.closed_at);
   const lastClosed = shifts.find(shift => shift.closed_at);
   const disabled = !online || busy;
+  const query = search.trim().toLocaleLowerCase('es');
+  const activeFilter = orderFilters.find(item => item.id === filter) ?? orderFilters[0];
+  const visible = orders.filter(order => activeFilter.matches(order,paid.has(order.id))
+    && (!query || order.customer.toLocaleLowerCase('es').includes(query) || String(order.number).includes(query.replace(/^#/,''))));
+  const title = staffRoutes[view].label;
   return <>
-    <div className="section-head"><h1>Caja</h1><button className="secondary" onClick={refresh}>Actualizar pedidos</button></div>
+    <div className="section-head">
+      <div><h1>{title}</h1>{view === 'orders' && <p className="muted">Hasta 80 pedidos recientes</p>}</div>
+      <div className="inline">
+        {view === 'orders' && <>
+          <button className="secondary" onClick={refresh}>Actualizar pedidos</button>
+          <a className="button" href={staffRoutes.manual.path} onClick={event => navigate('manual',event)}>Nuevo pedido manual</a>
+        </>}
+        {view !== 'orders' && <a className="button secondary" href={staffRoutes.orders.path} onClick={event => navigate('orders',event)}>Volver a pedidos</a>}
+      </div>
+    </div>
     {(error || notice) && <p className="notice" role="alert">{error || notice}</p>}
     {!online && <p className="notice" role="status">Usa comandas manuales durante la interrupción. La caja no registra nuevas operaciones sin conexión.</p>}
-    <section className={opened ? 'panel shift-panel is-open' : 'panel shift-panel'}>
+    {view === 'till' && <section className={opened ? 'panel shift-panel is-open' : 'panel shift-panel'}>
       <h2>{opened ? 'Turno abierto' : 'Turno cerrado'}</h2>
       {opened && <p>Fondo inicial · {money(opened.opening_cash)}</p>}
       <form className="inline" key={opened?.id ?? 'closed'} onSubmit={async event => {
@@ -77,10 +109,25 @@ export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:
         <button disabled={disabled}>{opened ? 'Cerrar turno' : 'Abrir turno'}</button>
       </form>
       {lastClosed && <p>Último cierre · Esperado {money(lastClosed.expected_cash ?? 0)} · Contado {money(lastClosed.counted_cash ?? 0)} · Diferencia {money(Number(lastClosed.counted_cash) - Number(lastClosed.expected_cash))}</p>}
-    </section>
-    {opened && online && <Store catalog={catalog} source="pos" onPlaced={refresh}/>}
-    <section><h2>Pedidos recientes</h2><div className="products">
-      {orders.map(order => <article key={order.id} className={'panel order '+(order.status === 'ready' ? 'ready' : '')}>
+    </section>}
+    {view === 'manual' && !loading && !opened && <div className="panel">
+      <h2>Abre un turno para registrar el pedido</h2>
+      <a className="button" href={staffRoutes.till.path} onClick={event => navigate('till',event)}>Ir a caja</a>
+    </div>}
+    {opened && online && <div hidden={view !== 'manual'}>
+      <Store catalog={catalog} source="pos" onPlaced={() => {void refresh();setFilter('all');setSearch('');navigate('orders');}}/>
+    </div>}
+    {view === 'orders' && <section aria-label="Lista de pedidos">
+      <div className="order-board-tools">
+        <label>Buscar pedido<input name="pedido" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre o número de pedido…"/></label>
+        <div className="chips" aria-label="Estados de pedidos">
+          {orderFilters.map(item => <button key={item.id} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
+            {item.label} <span>{orders.filter(order => item.matches(order,paid.has(order.id))).length}</span>
+          </button>)}
+        </div>
+      </div>
+      <div className="products order-board">
+      {visible.map(order => <article key={order.id} className={'panel order '+(order.status === 'ready' ? 'ready' : '')}>
         <div className="row"><h3>#{order.number} · {order.customer}</h3><strong>{money(order.total)}</strong></div>
         <p>{labels[order.status]} · {labels[order.source]} · {labels[order.mode]} {order.table_name}</p>
         {order.order_lines.map(line => <p key={line.id}>{line.quantity} × {line.name}{line.notes && ' · '+line.notes}</p>)}
@@ -89,11 +136,17 @@ export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:
           {order.status === 'received' && <button disabled={disabled} onClick={() => run('move_order',{p_id:order.id,p_status:'confirmed'})}>Enviar a cocina</button>}
           {order.status === 'ready' && <button disabled={disabled} onClick={() => run('move_order',{p_id:order.id,p_status:'delivered'})}>Confirmar entrega</button>}
           {admin && !paid.has(order.id) && !['delivered','cancelled'].includes(order.status) &&
-            <form className="inline" onSubmit={event => {
-              event.preventDefault();
-              const fields = new FormData(event.currentTarget);
-              void run('move_order',{p_id:order.id,p_status:'cancelled',p_reason:fields.get('reason')});
-            }}><label>Motivo<input name="reason" maxLength={500} required/></label><button className="secondary" disabled={disabled}>Cancelar</button></form>}
+            <details className="order-cancel">
+              <summary>Cancelar pedido</summary>
+              <form className="inline" onSubmit={event => {
+                event.preventDefault();
+                const fields = new FormData(event.currentTarget);
+                void run('move_order',{p_id:order.id,p_status:'cancelled',p_reason:fields.get('reason')});
+              }}>
+                <label>Motivo<input name="reason" maxLength={500} required/></label>
+                <button className="secondary" disabled={disabled}>Confirmar cancelación</button>
+              </form>
+            </details>}
         </div>
         {paid.has(order.id) ? <div className="inline"><p>Pagado {order.payments && '· '+labels[order.payments.method]}</p>{order.payments && <button className="secondary" onClick={() => setReceipt(order)}>Ver comprobante</button>}</div>
           : opened && order.status !== 'cancelled' && <form className="inline" onSubmit={event => {
@@ -105,7 +158,9 @@ export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:
             <button disabled={disabled}>Registrar cobro</button>
           </form>}
       </article>)}
-    </div>{!orders.length && <p className="empty">No hay pedidos para mostrar.</p>}</section>
+    </div>
+    {loading ? <p role="status">Cargando pedidos…</p> : !visible.length && <p className="empty">No hay pedidos para mostrar.</p>}
+    </section>}
     {receipt && <dialog open className={'panel receipt paper-'+paper}>
       <h2>{catalog.business.name}</h2><p>Comprobante de compra · #{receipt.number}</p>
       {receipt.order_lines.map(line => <p key={line.id}>{line.quantity} × {line.name} · {money(Number(line.price)*line.quantity)}</p>)}

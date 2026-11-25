@@ -20,9 +20,23 @@ before(async () => {
     create function auth.uid() returns uuid language sql stable as
       'select nullif(current_setting(''request.jwt.claim.sub'', true), '''')::uuid';
     grant usage on schema auth to authenticated, anon;
+    create schema storage;
+    create table storage.buckets (
+      id text primary key, name text not null, public boolean not null,
+      file_size_limit bigint, allowed_mime_types text[]
+    );
+    create table storage.objects (
+      bucket_id text not null references storage.buckets(id),
+      name text not null, owner_id text default auth.uid()::text, primary key (bucket_id,name)
+    );
+    create function storage.foldername(text) returns text[] language sql immutable as
+      'select (string_to_array($1, ''/''))[1:cardinality(string_to_array($1, ''/''))-1]';
+    grant usage on schema storage to anon, authenticated;
+    grant select, insert, delete on storage.objects to authenticated;
+    alter table storage.objects enable row level security;
     create publication supabase_realtime;
   `);
-  for (const file of ['202611250001_core.sql','202611250002_reports.sql']) {
+  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql']) {
     await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   }
   for (const [id,role] of [[admin,'admin'],[cashier,'cashier'],[kitchen,'kitchen'],[secondAdmin,'admin']]) {
@@ -164,4 +178,22 @@ test('solo administración modifica el menú y los agotados salen de la tienda',
   assert.equal(await value('delete from categories where id=$1 returning id value',[empty]),empty);
   await acting(null);
   assert.equal(await value('select name value from products where id=$1',[item]),'Producto renombrado');
+});
+
+test('Storage autoriza imágenes de administradores y protege archivos de otras sesiones', async () => {
+  await db.exec('reset role');
+  const bucket = await value("select to_jsonb(buckets) value from storage.buckets where id='qcachapa-images'");
+  assert.equal(bucket.public,true);
+  assert.equal(Number(bucket.file_size_limit),5242880);
+  assert.deepEqual(bucket.allowed_mime_types,['image/jpeg','image/png','image/webp','image/avif']);
+  const upload = (id) => db.query("insert into storage.objects(bucket_id,name) values ('qcachapa-images',$1)",[id+'/foto.png']);
+  await acting(cashier);
+  await assert.rejects(upload(cashier),{code:'42501'});
+  await acting(admin);
+  await assert.rejects(upload(secondAdmin),{code:'42501'});
+  await upload(admin);
+  await acting(secondAdmin);
+  assert.equal((await db.query("delete from storage.objects where name=$1",[admin+'/foto.png'])).affectedRows,0);
+  await acting(admin);
+  assert.equal((await db.query("delete from storage.objects where name=$1",[admin+'/foto.png'])).affectedRows,1);
 });

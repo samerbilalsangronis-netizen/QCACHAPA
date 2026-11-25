@@ -115,3 +115,86 @@
 @media(prefers-reduced-motion: reduce) {
   .menu-switch-track::after { transition: none; }
 }
+
+/* Filled surfaces make the editor's actions stand out without drawing a box around every row. */
+.menu-editor .menu-categories { border: 0; border-radius: 20px; background: #e9ebdf; padding: .9rem; }
+.menu-editor .menu-category-filter { border: 0; border-radius: 10px; }
+.menu-editor .menu-category-filter[aria-pressed=true] { background: #dce3ce; }
+.menu-editor .menu-product-row { border: 0; border-radius: 14px; box-shadow: 0 2px 8px #24301a0b; }
+.menu-editor .menu-product-row:hover { background: #fffcf3; }
+.menu-editor .menu-product-actions .secondary, .menu-editor .menu-new-category {
+  background: #e9ecdf; border: 0; border-radius: 10px;
+}
+.menu-editor .menu-product-filters :is(input,select), .menu-editor-dialog :is(input:not([type=file]),select,textarea) {
+  border-color: transparent; background: #e9ebdf;
+}
+.menu-editor .empty { border: 0; background: #e9ebdf; }
+.menu-editor-dialog { border: 0; border-radius: 22px; box-shadow: 0 20px 75px #151c183d; }
+.menu-editor-dialog[open] { animation: editor-arrive .34s cubic-bezier(.2,.75,.26,1) both; }
+.menu-editor-dialog[open]::backdrop { animation: editor-backdrop .22s ease both; }
+.menu-product-row { animation: list-arrive .32s ease-out both; }
+.menu-product-row:nth-child(2) { animation-delay: .035s; }
+.menu-product-row:nth-child(3) { animation-delay: .07s; }
+.menu-product-row:nth-child(4) { animation-delay: .105s; }
+.menu-editor .menu-switch-track { transition: background-color .17s ease; }
+
+.image-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  align-items: start;
+  gap: .75rem;
+  padding: .75rem;
+  border-radius: 14px;
+  background: #edf0e6;
+}
+.image-picker-preview {
+  display: grid;
+  width: 80px;
+  height: 72px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 11px;
+  background: #dce4d3;
+  color: #4a6041;
+}
+.image-picker-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #e4e7db;
+  animation: photo-arrive .3s ease-out both;
+}
+.image-picker-body { min-width: 0; display: grid; align-content: start; justify-items: start; gap: .2rem; }
+.image-picker-body > p { font-size: .82rem; color: var(--muted); }
+.image-picker-actions { display: flex; align-items: center; gap: .4rem .65rem; flex-wrap: wrap; min-width: 0; }
+.image-picker-select {
+  display: flex; align-items: center; position: relative; min-height: 44px; border-radius: 8px;
+  padding: .45rem .7rem; background: #d8e2ce; color: #283827; font-size: .82rem; font-weight: 700;
+}
+.image-picker-select:hover { background: #ccd9be; }
+.image-picker-select:focus-within { outline: 3px solid #946019; outline-offset: 2px; }
+.image-picker-select input {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; padding: 0; cursor: pointer;
+}
+.image-picker-filename { font-size: .82rem; overflow-wrap: anywhere; }
+.image-picker-body > button { padding-block: .2rem; padding-inline: 0; min-height: 36px; font-size: .82rem; }
+.image-picker-body .image-picker-error { color: #8c2b22; }
+.staff-dashboard .business-settings {
+  border: 0; border-radius: 20px; background: var(--paper); padding: clamp(1rem,3vw,1.5rem);
+}
+.business-images { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: .75rem; }
+@keyframes editor-arrive { from { transform: translateY(16px) scale(.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes editor-backdrop { from { opacity: 0; } to { opacity: 1; } }
+@keyframes list-arrive { from { transform: translateY(7px); opacity: .25; } to { transform: translateY(0); opacity: 1; } }
+@keyframes photo-arrive { from { transform: scale(.94); opacity: .1; } to { transform: scale(1); opacity: 1; } }
+@media(max-width: 460px) {
+  .image-picker { gap: .6rem; }
+  .image-picker-preview { width: 60px; height: 60px; }
+}
+@media(prefers-reduced-motion: reduce) {
+  .menu-editor-dialog[open], .menu-editor-dialog[open]::backdrop, .menu-product-row, .image-picker-preview img { animation: none; }
+  .menu-editor .menu-switch-track { transition: none; }
+}
+.business-setting-group { display: grid; gap: .8rem; padding-block: .4rem .9rem; }
+.business-setting-group + .business-setting-group { border-top: 1px solid #e7e9df; padding-top: .95rem; }
+.business-setting-group h2 { margin: 0; }

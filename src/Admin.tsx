@@ -2,6 +2,9 @@ import {useEffect,useState,type FormEvent} from 'react';
 import {type Catalog} from './data';
 import {db,labels,money,rpc,type Entry,type Business} from './model';
 import MenuEditor from './MenuEditor';
+import {staffRoutes,type AdminView} from './staffRoutes';
+import ImagePicker from './ImagePicker';
+import {saveCatalogImages} from './catalogImages';
 
 const client = () => db!;
 const entryTypes = ['note','task','event','incident'];
@@ -10,18 +13,13 @@ const today = (zone:string) => new Intl.DateTimeFormat('sv-SE',{dateStyle:'short
 
 type Summary = {sales:number; paid:number; average:number; active:number; finished:number; cancelled:number; open_shifts:number; methods:Record<string,number>};
 
-export default function Admin({catalog,user}:{catalog:Catalog;user:string}) {
-  const [tab,setTab] = useState('Resumen');
-  return <div className="admin-layout">
-    <nav className="admin-nav" aria-label="Administración">
-      {['Resumen','Menú','Organizador','Configuración'].map(item => <button key={item} aria-pressed={item === tab} onClick={() => setTab(item)}>{item}</button>)}
-    </nav>
-    <div>{tab !== 'Menú' && <h1>{tab}</h1>}
-      {tab === 'Resumen' && <Dashboard timezone={catalog.business.timezone}/>}
-      {tab === 'Menú' && <MenuEditor catalog={catalog}/>}
-      {tab === 'Organizador' && <Organizer user={user} timezone={catalog.business.timezone}/>}
-      {tab === 'Configuración' && <Settings catalog={catalog}/>}
-    </div>
+export default function Admin({catalog,user,section}:{catalog:Catalog;user:string;section:AdminView}) {
+  return <div key={section} className="admin-view">
+    {section !== 'menu' && <h1 className="staff-section-title">{staffRoutes[section].label}</h1>}
+    {section === 'reports' && <Dashboard timezone={catalog.business.timezone}/>}
+    {section === 'menu' && <MenuEditor catalog={catalog}/>}
+    {section === 'organizer' && <Organizer user={user} timezone={catalog.business.timezone}/>}
+    {section === 'settings' && <Settings catalog={catalog}/>}
   </div>;
 }
 
@@ -78,18 +76,33 @@ function Settings({catalog}:{catalog:Catalog}) {
   const {business} = catalog;
   const {message,busy,save} = useSave(catalog.refresh);
   const fields:[keyof Business,string,string?][] = [
-    ['name','Nombre comercial'],['slogan','Eslogan'],['logo_url','Logo oficial (URL)','url'],
-    ['hero_url','Foto de portada (URL)','url'],['address','Dirección'],['hours','Horarios'],['whatsapp','WhatsApp','tel'],
+    ['name','Nombre comercial'],['slogan','Eslogan'],['address','Dirección'],['whatsapp','WhatsApp','tel'],
   ];
-  return <form className="panel" key={JSON.stringify(business)} onSubmit={event => {
+  return <form className="panel business-settings" key={JSON.stringify(business)} onSubmit={event => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const payload = Object.fromEntries(fields.map(([field]) => [field,data.get(field) || null]));
-    void save(() => client().from('business').update({...payload,accepting_orders:data.get('accepting_orders') === 'on'}).eq('id',true));
+    void save(() => saveCatalogImages(client(), data, ['logo_url','hero_url'], images =>
+      client().from('business').update({...payload,...images,hours:data.get('hours') || null,accepting_orders:data.get('accepting_orders') === 'on'}).eq('id',true).select('id').single()));
   }}>
-    <div className="form-grid">{fields.map(([key,label,type]) => <label key={key}>{label}<input name={key} type={type ?? 'text'} required={key === 'name' || key === 'slogan'} defaultValue={String(business[key] ?? '')}/></label>)}</div>
-    <label className="check"><input name="accepting_orders" type="checkbox" defaultChecked={business.accepting_orders}/> Aceptar pedidos en línea</label>
-    <button disabled={busy}>Guardar configuración</button>
+    <fieldset disabled={busy}>
+      <section className="business-setting-group" aria-labelledby="business-identity-title">
+        <h2 id="business-identity-title">Negocio</h2>
+        <div className="form-grid">{fields.map(([key,label,type]) => <label key={key}>{label}
+          <input name={key} type={type ?? 'text'} required={key === 'name' || key === 'slogan'} defaultValue={String(business[key] ?? '')}/>
+        </label>)}</div>
+        <div className="business-images">
+          <ImagePicker name="logo_url" label="Logo del negocio" current={business.logo_url} fallback="/logo-qcachapas.webp"/>
+          <ImagePicker name="hero_url" label="Foto de portada" current={business.hero_url} fallback="/cachapa-portada-movil.webp"/>
+        </div>
+      </section>
+      <section className="business-setting-group" aria-labelledby="business-hours-title">
+        <h2 id="business-hours-title">Pedidos y horario</h2>
+        <label>Horario visible en la tienda<input name="hours" defaultValue={business.hours ?? ''}/></label>
+        <label className="check"><input name="accepting_orders" type="checkbox" defaultChecked={business.accepting_orders}/> Aceptar pedidos en línea</label>
+      </section>
+      <button>{busy ? 'Guardando…' : 'Guardar configuración'}</button>
+    </fieldset>
     {message && <p className="notice" role="status">{message}</p>}
   </form>;
 }

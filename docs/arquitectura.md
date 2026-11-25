@@ -2,6 +2,22 @@
 
 React, TypeScript, Vite y Tailwind sirven el portal y los paneles internos. Supabase Auth identifica al personal. PostgreSQL aplica permisos por rol, calcula importes y ejecuta cambios de estado en transacciones. Realtime difunde cambios en una proyección de cocina sin datos personales ni importes. El seguimiento público consulta únicamente un estado mediante un secreto aleatorio. Netlify sirve la PWA.
 
+## Referencia funcional de Habibis
+
+Se revisó Habibis en el commit `c7c8c2c`. Su aplicación Next.js separa la tienda, el carrito lateral, el formulario de pedido y el seguimiento. El área de personal usa un menú por rol con rutas para pedidos, pedidos manuales, catálogo, reportes y ajustes. El tablero distingue el avance de la comanda y el estado de cobro.
+
+QCACHAPA aplica esa separación en React y Vite:
+
+| Flujo | Acceso en QCACHAPA |
+| --- | --- |
+| Menú, carrito y confirmación | `/` y `/checkout/`. El cliente recupera su carrito al navegar. |
+| Seguimiento | `/pedido/#…`. El token permanece en el fragmento del navegador. |
+| Pedidos y pedido manual | `/personal/pedidos/` y `/personal/pedidos/nuevo/`. Los filtros actúan sobre los últimos 80 pedidos visibles para el usuario. |
+| Turno de caja y cocina | `/personal/caja/` y `/personal/cocina/`. Conservan los permisos y acciones existentes de cada módulo. |
+| Administración | `/personal/menu/`, `/personal/reportes/`, `/personal/ajustes/` y `/personal/organizador/`. |
+
+El acceso heredado `/personal/` abre el flujo correspondiente al rol. Supabase sigue autorizando cada consulta y operación crítica. Los comprobantes, modificadores, tasas de cambio y despacho que aparecen en Habibis requieren su propia implementación para el modelo de QCACHAPA.
+
 ## Modelo inicial
 
 - Configuración comercial, categorías y productos con precios en USD.
