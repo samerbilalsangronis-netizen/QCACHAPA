@@ -1,4 +1,4 @@
-const CACHE = 'qcachapa-shell-2';
+const CACHE = 'qcachapa-shell-4';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -6,7 +6,7 @@ self.addEventListener('install', event => {
     const html = await response.clone().text();
     const assets = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g), match => match[1]);
     await cache.put('/', response);
-    await cache.addAll([...assets,'/cachapa.webp','/manifest.webmanifest','/icon-192.png','/icon-512.png']);
+    await cache.addAll([...assets,'/logo-qcachapas.webp','/cachapa.webp','/cachapa-portada.webp','/cachapa-portada-movil.webp','/manifest.webmanifest','/icon-192.png','/icon-512.png']);
   })());
 });
 self.addEventListener('activate', event => {
@@ -22,7 +22,7 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(async () => (await caches.match('/')) ?? Response.error()));
-  } else if (url.pathname.startsWith('/assets/') || /\/(cachapa.webp|manifest.webmanifest|icon-\d+.png)$/.test(url.pathname)) {
+  } else if (url.pathname.startsWith('/assets/') || /\/(logo-qcachapas\.webp|cachapa(?:-portada(?:-movil)?)?\.webp|manifest.webmanifest|icon-\d+.png)$/.test(url.pathname)) {
     event.respondWith((async () => {
       if (!url.pathname.startsWith('/assets/')) {
         try { return await fetch(request); } catch { return (await caches.match(request.url,{ignoreVary:true})) ?? Response.error(); }

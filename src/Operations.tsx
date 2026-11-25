@@ -65,7 +65,7 @@ export function Cashier({catalog,user,admin}:{catalog:Catalog;user:string;admin:
     <div className="section-head"><h1>Caja</h1><button className="secondary" onClick={refresh}>Actualizar pedidos</button></div>
     {(error || notice) && <p className="notice" role="alert">{error || notice}</p>}
     {!online && <p className="notice" role="status">Usa comandas manuales durante la interrupción. La caja no registra nuevas operaciones sin conexión.</p>}
-    <section className="panel">
+    <section className={opened ? 'panel shift-panel is-open' : 'panel shift-panel'}>
       <h2>{opened ? 'Turno abierto' : 'Turno cerrado'}</h2>
       {opened && <p>Fondo inicial · {money(opened.opening_cash)}</p>}
       <form className="inline" key={opened?.id ?? 'closed'} onSubmit={async event => {
@@ -183,27 +183,34 @@ export function Kitchen({timezone}:{timezone:string}) {
       }}>Pantalla completa</button></div>
     </div>
     {(notice || error) && <p role="alert" className="notice">{notice || error}</p>}
-    <div className="kanban">{['confirmed','preparing','ready'].map(status => <section key={status}>
-      <h2>{status === 'confirmed' ? 'Nuevos pedidos' : labels[status]}</h2>
-      {tickets.filter(ticket => ticket.status === status).map(ticket => {
-        const elapsed = Math.max(0,Math.floor((now-Date.parse(ticket.created_at))/60000));
-        const urgency = elapsed >= ticket.prep_minutes ? 'late' : elapsed >= ticket.prep_minutes*.75 ? 'soon' : 'normal';
-        return <article className={'panel ticket '+urgency} key={ticket.id}>
-          <div className="row"><h3>#{ticket.number}</h3><strong>{elapsed} min</strong></div>
-          <p>{time(ticket.created_at,timezone)} · {labels[ticket.source]} · {labels[ticket.mode]} {ticket.table_name}</p>
-          <ul>{ticket.lines.map(line => <li key={line.id}><strong>{line.quantity} × {line.name}</strong>
-            {line.notes && <div className="notice">{line.notes}</div>}
-            {status === 'preparing' && <label className="check">
-              <input type="checkbox" checked={Boolean(line.prepared)} disabled={busy || !online}
-                onChange={event => run('prepare_line',{p_id:ticket.id,p_line:line.id,p_prepared:event.target.checked})}/>
-              {line.prepared ? 'Preparado' : 'Marcar producto preparado'}
-            </label>}</li>)}</ul>
-          {ticket.notes && <p className="notice">{ticket.notes}</p>}
-          {status !== 'ready' && <button disabled={busy || !online} onClick={() => run('move_order',{
-            p_id:ticket.id,p_status:status === 'confirmed' ? 'preparing' : 'ready',
-          })}>{status === 'confirmed' ? 'Iniciar preparación' : 'Marcar listo'}</button>}
-        </article>;
-      })}
-    </section>)}</div>
+    <div className="kanban">{['confirmed','preparing','ready'].map(status => {
+      const column = tickets.filter(ticket => ticket.status === status);
+      return <section key={status}>
+        <div className="kitchen-column-title">
+          <h2>{status === 'confirmed' ? 'Nuevos pedidos' : labels[status]}</h2>
+          <span aria-label={column.length === 1 ? '1 pedido' : column.length + ' pedidos'}>{column.length}</span>
+        </div>
+        {!column.length && <p className="kitchen-empty">Sin pedidos</p>}
+        {column.map(ticket => {
+          const elapsed = Math.max(0,Math.floor((now-Date.parse(ticket.created_at))/60000));
+          const urgency = elapsed >= ticket.prep_minutes ? 'late' : elapsed >= ticket.prep_minutes*.75 ? 'soon' : 'normal';
+          return <article className={'panel ticket '+urgency} key={ticket.id}>
+            <div className="row"><h3>#{ticket.number}</h3><strong>{elapsed} min</strong></div>
+            <p>{time(ticket.created_at,timezone)} · {labels[ticket.source]} · {labels[ticket.mode]} {ticket.table_name}</p>
+            <ul>{ticket.lines.map(line => <li key={line.id}><strong>{line.quantity} × {line.name}</strong>
+              {line.notes && <div className="notice">{line.notes}</div>}
+              {status === 'preparing' && <label className="check">
+                <input type="checkbox" checked={Boolean(line.prepared)} disabled={busy || !online}
+                  onChange={event => run('prepare_line',{p_id:ticket.id,p_line:line.id,p_prepared:event.target.checked})}/>
+                {line.prepared ? 'Preparado' : 'Marcar producto preparado'}
+              </label>}</li>)}</ul>
+            {ticket.notes && <p className="notice">{ticket.notes}</p>}
+            {status !== 'ready' && <button disabled={busy || !online} onClick={() => run('move_order',{
+              p_id:ticket.id,p_status:status === 'confirmed' ? 'preparing' : 'ready',
+            })}>{status === 'confirmed' ? 'Iniciar preparación' : 'Marcar listo'}</button>}
+          </article>;
+        })}
+      </section>;
+    })}</div>
   </section>;
 }

@@ -142,3 +142,26 @@ test('el consolidado agrega más de mil cobros en la base de datos', async () =>
   assert.equal(summary.paid,1002);
   assert.equal(summary.methods.transfer,2252.25);
 });
+
+test('solo administración modifica el menú y los agotados salen de la tienda', async () => {
+  await acting(admin);
+  const category = await value("insert into categories(name) values ('Categoría de menú') returning id value");
+  const item = await value("insert into products(category_id,name,price) values ($1,'Producto editable',6) returning id value",[category]);
+  await assert.rejects(db.query('delete from categories where id=$1',[category]),{code:'23503'});
+  await db.query("update categories set name='Categoría renombrada' where id=$1",[category]);
+  await db.query("update products set name='Producto renombrado',price=7,available=false where id=$1",[item]);
+
+  await acting(cashier);
+  assert.equal(await value('select available value from products where id=$1',[item]),false);
+  assert.equal((await db.query('update products set available=true where id=$1',[item])).affectedRows,0);
+  await acting(null);
+  assert.equal(await value('select id value from products where id=$1',[item]),undefined);
+  assert.equal(await value('select name value from categories where id=$1',[category]),'Categoría renombrada');
+
+  await acting(admin);
+  await db.query('update products set available=true where id=$1',[item]);
+  const empty = await value("insert into categories(name) values ('Categoría vacía') returning id value");
+  assert.equal(await value('delete from categories where id=$1 returning id value',[empty]),empty);
+  await acting(null);
+  assert.equal(await value('select name value from products where id=$1',[item]),'Producto renombrado');
+});

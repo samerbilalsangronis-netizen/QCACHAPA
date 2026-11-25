@@ -1,6 +1,7 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {type Catalog} from './data';
-import {db,labels,money,rpc,type Entry,type Product,type Business} from './model';
+import {db,labels,money,rpc,type Entry,type Business} from './model';
+import MenuEditor from './MenuEditor';
 
 const client = () => db!;
 const entryTypes = ['note','task','event','incident'];
@@ -13,11 +14,11 @@ export default function Admin({catalog,user}:{catalog:Catalog;user:string}) {
   const [tab,setTab] = useState('Resumen');
   return <div className="admin-layout">
     <nav className="admin-nav" aria-label="Administración">
-      {['Resumen','Catálogo','Organizador','Configuración'].map(item => <button key={item} aria-pressed={item === tab} onClick={() => setTab(item)}>{item}</button>)}
+      {['Resumen','Menú','Organizador','Configuración'].map(item => <button key={item} aria-pressed={item === tab} onClick={() => setTab(item)}>{item}</button>)}
     </nav>
-    <div><h1>{tab}</h1>
+    <div>{tab !== 'Menú' && <h1>{tab}</h1>}
       {tab === 'Resumen' && <Dashboard timezone={catalog.business.timezone}/>}
-      {tab === 'Catálogo' && <Menu catalog={catalog}/>}
+      {tab === 'Menú' && <MenuEditor catalog={catalog}/>}
       {tab === 'Organizador' && <Organizer user={user} timezone={catalog.business.timezone}/>}
       {tab === 'Configuración' && <Settings catalog={catalog}/>}
     </div>
@@ -71,55 +72,6 @@ function useSave(refresh:()=>Promise<void>) {
     finally {setBusy(false);}
   }
   return {message,busy,save};
-}
-
-function Menu({catalog}:{catalog:Catalog}) {
-  const [editing,setEditing] = useState<Product|null>(null);
-  const {message,busy,save} = useSave(catalog.refresh);
-  function product(event:FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form));
-    const row = {...payload,price:Number(payload.price),prep_minutes:Number(payload.prep_minutes),available:payload.available === 'on',image_url:payload.image_url || null};
-    void save(() => editing ? client().from('products').update(row).eq('id',editing.id) : client().from('products').insert(row),
-      () => {setEditing(null);form.reset();});
-  }
-  return <>
-    <div className="panel"><h2>Categorías</h2>
-      <form className="inline" onSubmit={event => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const name = String(new FormData(form).get('name')).trim();
-        if (name) void save(() => client().from('categories').insert({name}),() => form.reset());
-      }}><label>Nueva categoría<input name="name" maxLength={100} required/></label><button disabled={busy}>Agregar</button></form>
-      {catalog.categories.map(category => <form className="inline" key={category.id} onSubmit={event => {
-        event.preventDefault();
-        const name = String(new FormData(event.currentTarget).get('name')).trim();
-        if (name) void save(() => client().from('categories').update({name}).eq('id',category.id));
-      }}><input name="name" aria-label="Nombre de categoría" key={category.name} defaultValue={category.name} required maxLength={100}/>
-        <button className="secondary" disabled={busy}>Renombrar</button></form>)}
-    </div>
-    <form className="panel" key={editing?.id ?? 'new'} onSubmit={product}>
-      <h2>{editing ? 'Editar producto' : 'Nuevo producto'}</h2>
-      <div className="form-grid">
-        <label>Nombre<input name="name" defaultValue={editing?.name} maxLength={120} required/></label>
-        <label>Categoría<select name="category_id" defaultValue={editing?.category_id} required>
-          <option value="">Elige una categoría</option>{catalog.categories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select></label>
-        <label>Precio en USD<input name="price" type="number" step=".01" min="0" defaultValue={editing?.price} required/></label>
-        <label>Preparación en minutos<input name="prep_minutes" type="number" min="1" max="1440" defaultValue={editing?.prep_minutes ?? 20} required/></label>
-        <label>Foto (URL)<input name="image_url" type="url" defaultValue={editing?.image_url ?? ''}/></label>
-        <label>Descripción<textarea name="description" defaultValue={editing?.description} maxLength={2000}/></label>
-        <label className="check"><input name="available" type="checkbox" defaultChecked={editing?.available ?? true}/> Disponible</label>
-      </div>
-      <div className="inline"><button disabled={busy}>Guardar producto</button>{editing && <button type="button" className="secondary" onClick={() => setEditing(null)}>Cerrar edición</button>}</div>
-    </form>
-    {message && <p role="status" className="notice">{message}</p>}
-    <section className="panel"><h2>Productos</h2>{catalog.products.length ? catalog.products.map(item => <div className="row cart-line" key={item.id}>
-      <div><strong>{item.name}</strong><p>{money(item.price)} · {item.available ? 'Disponible' : 'No disponible'}</p></div>
-      <button className="secondary" onClick={() => setEditing(item)}>Editar</button>
-    </div>) : <p>El catálogo aún no tiene productos.</p>}</section>
-  </>;
 }
 
 function Settings({catalog}:{catalog:Catalog}) {

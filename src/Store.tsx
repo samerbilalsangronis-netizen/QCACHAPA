@@ -1,4 +1,4 @@
-import {useRef,useState,type FormEvent} from 'react';
+import {useRef,useState,type FormEvent,type RefObject} from 'react';
 import {type Catalog} from './data';
 import {money,readStored,rpc,saveStored,type Product} from './model';
 
@@ -6,7 +6,7 @@ type CartLine = {product_id:string; quantity:number; notes:string};
 type Draft = {key:string; lines:CartLine[]};
 const newDraft = ():Draft => ({key:crypto.randomUUID(),lines:[]});
 
-export function Store({catalog,source='web',onPlaced}:{catalog:Catalog; source?:'web'|'pos'; onPlaced?:()=>void}) {
+export function Store({catalog,source='web',onPlaced,cartDialog}:{catalog:Catalog; source?:'web'|'pos'; onPlaced?:()=>void; cartDialog?:RefObject<HTMLDialogElement|null>}) {
   const storage = 'qc-cart-' + source;
   const {categories,products,business} = catalog;
   const [draft,setDraft] = useState(() => source === 'web' ? readStored(storage,newDraft()) : newDraft());
@@ -19,6 +19,7 @@ export function Store({catalog,source='web',onPlaced}:{catalog:Catalog; source?:
   const cart = useRef<HTMLElement>(null);
   const byId = new Map(products.map(product => [product.id,product]));
   const total = draft.lines.reduce((sum,line) => sum + Number(byId.get(line.product_id)?.price ?? 0) * line.quantity,0);
+  const hasUnavailable = draft.lines.some(line => !byId.get(line.product_id)?.available);
   const count = draft.lines.reduce((sum,line) => sum + line.quantity,0);
   const visible = products.filter(product => product.available && (!category || product.category_id === category)
     && (product.name + ' ' + product.description).toLocaleLowerCase().includes(query.toLocaleLowerCase().trim()));
@@ -65,56 +66,79 @@ export function Store({catalog,source='web',onPlaced}:{catalog:Catalog; source?:
     }
   }
 
-  return <section id="menu" className="store shell">
+  function showCart() {
+    if (cartDialog?.current) cartDialog.current.showModal();
+    else cart.current?.scrollIntoView();
+  }
+
+  const basket = <>
+    <div className="row cart-heading">
+      <h3 id={cartDialog ? 'portal-cart-title' : undefined}>Tu pedido <span>{count}</span></h3>
+      {cartDialog && <button type="button" className="cart-close secondary" aria-label="Cerrar pedido" onClick={() => cartDialog.current?.close()}>×</button>}
+    </div>
+    {!count ? <div className="cart-empty">
+      <p className="muted">Aquí aparecerán los productos que elijas.</p>
+      {cartDialog && <button type="button" className="secondary" onClick={() => {
+        cartDialog.current?.close();
+        document.getElementById('menu')?.focus();
+      }}>Volver al menú</button>}
+    </div> :
+      <form onSubmit={place}>
+        <fieldset disabled={busy}>
+          {draft.lines.map((line,index) => {
+            const product = byId.get(line.product_id);
+            return <div className="cart-line" key={index}>
+              <div className="row"><strong>{product?.name ?? 'Producto no disponible'}</strong>
+                <button type="button" className="text-button" onClick={() => update(draft.lines.filter((_,i) => i !== index))}>Quitar</button></div>
+              {!product?.available && <p className="notice">Agotado. Quita este producto para continuar.</p>}
+            <label>Cantidad<input type="number" min={1} max={99} value={line.quantity} onChange={e => {
+                const value = e.target.valueAsNumber;
+                if (Number.isInteger(value) && value >= 1 && value <= 99) update(draft.lines.map((item,i) => i === index ? {...item,quantity:value} : item));
+              }}/></label>
+              <label>Indicaciones del producto<input value={line.notes} maxLength={300} onChange={e => update(draft.lines.map((item,i) => i === index ? {...item,notes:e.target.value} : item))}/></label>
+            </div>;
+          })}
+          <div className="row total"><span>Total estimado</span><strong>{money(total)}</strong></div>
+          <label>Modalidad<select value={mode} onChange={e => setMode(e.target.value)}><option value="pickup">Retiro en local</option><option value="table">Consumo en mesa</option></select></label>
+          {mode === 'table' && <label>Mesa<input name="table" required maxLength={40}/></label>}
+          <label>Nombre<input name="customer" required maxLength={100} autoComplete="name"/></label>
+          <label>Teléfono (opcional)<input name="phone" type="tel" maxLength={40} autoComplete="tel"/></label>
+          <label>Observaciones del pedido<textarea name="notes" maxLength={500}/></label>
+          {error && <p className="notice" role="alert">{error}</p>}
+          <button disabled={hasUnavailable || (source === 'web' && !business.accepting_orders)}>{busy ? 'Registrando…' : 'Confirmar pedido'}</button>
+        </fieldset>
+      </form>}
+  </>;
+
+  return <section id="menu" className="store shell" tabIndex={source === 'web' ? -1 : undefined}>
     <div className="section-head">
-      <div><p className="eyebrow">EL SABOR DE VENEZUELA</p><h2>{source === 'web' ? 'Nuestro menú' : 'Nueva venta'}</h2></div>
-      <button className="secondary" onClick={() => cart.current?.scrollIntoView({behavior:'smooth'})}>Carrito · {count}</button>
+      <div><h2>{source === 'web' ? 'Nuestro menú' : 'Nueva venta'}</h2></div>
+      <button className="secondary store-cart-button" onClick={showCart} aria-haspopup={cartDialog ? 'dialog' : undefined}>Carrito <span aria-live="polite"><span key={count}>{count}</span></span></button>
     </div>
     <div className="store-grid">
       <div>
-        <input aria-label="Buscar productos" placeholder="Buscar en el menú…" value={query} onChange={e => setQuery(e.target.value)}/>
-        <div className="chips" aria-label="Categorías">
-          <button aria-pressed={!category} onClick={() => setCategory('')}>Todo el menú</button>
-          {categories.map(item => <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.name}</button>)}
+        <div className="menu-controls">
+          <input type="search" name="productos" aria-label="Buscar productos" placeholder="Buscar en el menú…" value={query} onChange={e => setQuery(e.target.value)}/>
+          <div className="chips" aria-label="Categorías">
+            <button aria-pressed={!category} onClick={() => setCategory('')}>Todo el menú</button>
+            {categories.map(item => <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.name}</button>)}
+          </div>
         </div>
         {catalog.error && <p role="alert" className="notice">{catalog.error}</p>}
         {catalog.loading ? <p>Cargando menú…</p> : visible.length ? <div className="products">
           {visible.map(product => <article className="product" key={product.id}>
-            {product.image_url && <img src={product.image_url} alt={product.name} loading="lazy"/>}
+            {product.image_url && <img src={product.image_url} alt={product.name} width={800} height={500} loading="lazy"/>}
             <div><h3>{product.name}</h3><p>{product.description}</p>
               <div className="row"><strong>{money(product.price)}</strong><button disabled={busy || (source === 'web' && !business.accepting_orders)} onClick={() => add(product)}>Agregar</button></div>
             </div>
           </article>)}
-        </div> : <div className="empty">{query || category ? 'No encontramos productos con estos filtros.' : 'El menú aún no está disponible.'}</div>}
+        </div> : <div className="empty">{query || category ? 'No encontramos productos con estos filtros.' : 'El menú todavía no está disponible.'}</div>}
       </div>
-      <aside className="cart panel" ref={cart}>
-        <h3>Tu pedido <span>{count}</span></h3>
-        {!count ? <p className="muted">Aquí aparecerán los productos que elijas.</p> :
-          <form onSubmit={place}>
-            <fieldset disabled={busy}>
-              {draft.lines.map((line,index) => {
-                const product = byId.get(line.product_id);
-                return <div className="cart-line" key={index}>
-                  <div className="row"><strong>{product?.name ?? 'Producto no disponible'}</strong>
-                    <button type="button" className="text-button" onClick={() => update(draft.lines.filter((_,i) => i !== index))}>Quitar</button></div>
-                  <label>Cantidad<input type="number" min={1} max={99} value={line.quantity} onChange={e => {
-                    const value = e.target.valueAsNumber;
-                    if (Number.isInteger(value) && value >= 1 && value <= 99) update(draft.lines.map((item,i) => i === index ? {...item,quantity:value} : item));
-                  }}/></label>
-                  <label>Indicaciones del producto<input value={line.notes} maxLength={300} onChange={e => update(draft.lines.map((item,i) => i === index ? {...item,notes:e.target.value} : item))}/></label>
-                </div>;
-              })}
-              <div className="row total"><span>Total estimado</span><strong>{money(total)}</strong></div>
-              <label>Modalidad<select value={mode} onChange={e => setMode(e.target.value)}><option value="pickup">Retiro en local</option><option value="table">Consumo en mesa</option></select></label>
-              {mode === 'table' && <label>Mesa<input name="table" required maxLength={40}/></label>}
-              <label>Nombre<input name="customer" required maxLength={100} autoComplete="name"/></label>
-              <label>Teléfono (opcional)<input name="phone" type="tel" maxLength={40} autoComplete="tel"/></label>
-              <label>Observaciones del pedido<textarea name="notes" maxLength={500}/></label>
-              {error && <p className="notice" role="alert">{error}</p>}
-              <button disabled={source === 'web' && !business.accepting_orders}>{busy ? 'Registrando…' : 'Confirmar pedido'}</button>
-            </fieldset>
-          </form>}
-      </aside>
+      {cartDialog ? <dialog className="portal-cart" ref={cartDialog} aria-labelledby="portal-cart-title" onClick={event => {
+        if (event.target === event.currentTarget) event.currentTarget.close();
+      }}>
+        <div className="portal-cart-inner">{basket}</div>
+      </dialog> : <aside className="cart panel" ref={cart}>{basket}</aside>}
     </div>
   </section>;
 }
