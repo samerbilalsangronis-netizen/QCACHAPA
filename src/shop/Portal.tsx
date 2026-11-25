@@ -14,7 +14,7 @@ export default function Portal() {
 
   return <div className="portal">
     <a className="portal-skip" href="#menu">Saltar al menú</a>
-    <header className="portal-header">
+    <header className="portal-header storefront-header">
       <div className="shell masthead">
         <Brand business={business}/>
         <nav aria-label="Navegación principal">

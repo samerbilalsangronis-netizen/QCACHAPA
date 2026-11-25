@@ -45,7 +45,7 @@ export default function LunchWheel({background,slogan}:{background:string|null;s
     <div className="shell wheel-layout">
       <div className="wheel-copy">
         <p className="wheel-eyebrow">Cocina venezolana desde 2007</p>
-        <h1>De almuerzo <br/>a cena</h1>
+        <h1>Disfruta de nuestra variedad de almuerzos</h1>
         <p className="wheel-slogan">{slogan}</p>
         <a className="button portal-primary" href="#menu">Explorar el menú <span aria-hidden="true">↓</span></a>
       </div>

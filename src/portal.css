@@ -194,3 +194,10 @@ html:has(.portal-cart[open]) { overflow: hidden; }
 .checkout-page h1 { font: 800 clamp(2.65rem,6vw,4.3rem)/1 'Barlow Condensed',sans-serif; margin-bottom: 1.1rem; }
 .checkout-basket { border: 0; border-radius: 18px; }
 .checkout-basket .cart-heading { margin-bottom: .85rem; }
+
+.portal .storefront-header .masthead { min-height: 100px; }
+.portal .storefront-header .brand img { height: 92px; max-width: min(170px,37vw); }
+@media (max-width: 760px) {
+  .portal .storefront-header .masthead { min-height: 82px; }
+  .portal .storefront-header .brand img { height: 74px; }
+}

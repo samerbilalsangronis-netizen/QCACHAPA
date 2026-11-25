@@ -3,18 +3,20 @@
   isolation: isolate;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 77% 44%,#8a4d29 0%,#4b301f 29%,transparent 62%),
+    radial-gradient(ellipse at 64% 44%,#8a4d29 0%,#4b301f 29%,transparent 62%),
     #21251a;
   color: #fff4db;
 }
 .wheel-background { position: absolute; z-index: -1; width: 100%; height: 100%; object-fit: cover; opacity: .14; }
-.wheel-layout { display: grid; grid-template-columns: 37% minmax(0,1fr); align-items: center; min-height: min(690px,60vw); }
+.wheel-layout { display: grid; grid-template-columns: 37% minmax(0,1fr); align-items: center; min-height: min(620px,55vw); }
 .wheel-copy { z-index: 2; padding: 3rem 0; }
 .wheel-eyebrow { color: #ffd174; font-size: .92rem; font-weight: 750; }
 .wheel-copy h1 {
-  font: 800 clamp(4rem,7vw,7rem)/.83 'Barlow Condensed',sans-serif;
+  font: 800 clamp(3.1rem,5.15vw,5.4rem)/.93 'Barlow Condensed',sans-serif;
   letter-spacing: -.025em;
   margin: .9rem 0 1.2rem;
+  max-width: 11em;
+  text-wrap: balance;
 }
 .wheel-slogan { margin-bottom: 1.15rem; max-width: 28ch; color: #f1dfc7; }
 .lunch-wheel .portal-primary { background: #ffc650; color: #21251a; }
@@ -23,7 +25,7 @@
 .wheel-plates {
   position: relative;
   isolation: isolate;
-  height: clamp(310px,36vw,500px);
+  height: clamp(310px,34vw,468px);
   touch-action: pan-y;
   user-select: none;
 }
@@ -31,8 +33,9 @@
   content: '';
   position: absolute;
   z-index: -2;
-  top: 10%; left: 14%;
-  width: 89%; aspect-ratio: 1;
+  top: 10%; left: 42%;
+  transform: translateX(-50%);
+  width: 77%; aspect-ratio: 1;
   border: 1px solid #ffc36c37;
   border-radius: 50%;
   box-shadow: inset 0 0 0 18px #ffd1840d, inset 0 0 0 19px #ffc36c26;
@@ -41,19 +44,19 @@
   position: absolute;
   width: clamp(230px,34vw,468px);
   height: auto;
-  top: 52%; left: 51%;
+  top: 52%; left: 42%;
   object-fit: contain;
   pointer-events: none;
   filter: drop-shadow(0 17px 22px #1b120e94);
   transition: transform .94s cubic-bezier(.22,.75,.19,1), opacity .65s ease;
 }
 .wheel-plate[data-step="0"] { z-index: 1; transform: translate(-50%,-50%) rotate(0); opacity: 1; }
-.wheel-plate[data-step="1"] { transform: translate(52%,-19%) rotate(28deg) scale(.63); opacity: .66; }
+.wheel-plate[data-step="1"] { transform: translate(23%,-19%) rotate(28deg) scale(.63); opacity: .66; }
 .wheel-plate[data-step="2"] { transform: translate(2%,46%) rotate(48deg) scale(.47); opacity: 0; }
-.wheel-plate[data-step="3"] { transform: translate(-149%,-12%) rotate(-26deg) scale(.6); opacity: .18; }
+.wheel-plate[data-step="3"] { transform: translate(-121%,-12%) rotate(-26deg) scale(.6); opacity: .18; }
 .wheel-meta {
   position: relative; z-index: 2;
-  margin-inline: 9% 0;
+  width: 84%;
   min-height: 122px;
   padding: .5rem 0 1.1rem;
   text-align: center;
@@ -86,14 +89,15 @@
 @media(max-width: 800px) {
   .wheel-layout { grid-template-columns: minmax(0,1fr); min-height: auto; }
   .wheel-copy { padding: 1.55rem 0 .4rem; }
-  .wheel-copy h1 { font-size: clamp(3.9rem,13vw,6.2rem); }
-  .wheel-copy h1 br { display: none; }
+  .wheel-copy h1 { font-size: clamp(2.9rem,10vw,5.5rem); }
   .wheel-slogan { margin-bottom: .75rem; }
   .wheel-copy .portal-primary { min-height: 44px; }
   .wheel-plates { height: clamp(240px,66vw,390px); }
   .wheel-plate { width: clamp(220px,64vw,370px); left: 50%; }
-  .wheel-meta { margin-inline: 0; }
-  .wheel-plates::before { top: 4%; left: 12%; width: 80%; }
+  .wheel-meta { width: 100%; }
+  .wheel-plate[data-step="1"] { transform: translate(-1%,-19%) rotate(28deg) scale(.6); }
+  .wheel-plate[data-step="3"] { transform: translate(-100%,-12%) rotate(-26deg) scale(.58); }
+  .wheel-plates::before { top: 4%; left: 50%; width: 80%; }
 }
 @media(prefers-reduced-motion: reduce) {
   .wheel-plate { transition: none; }

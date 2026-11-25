@@ -1,4 +1,4 @@
-const CACHE = 'qcachapa-shell-5';
+const CACHE = 'qcachapa-shell-6';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
