@@ -14,7 +14,7 @@
 
    Para empleados adicionales usa `cashier` o `kitchen`. Desactiva el acceso cambiando `active` a `false` en `public.staff`. Las políticas y funciones comprueban este campo durante las operaciones.
 5. En **Ajustes**, selecciona archivos para el logo y la portada. En **Menú**, agrega la foto desde el formulario del producto. Puedes cargar JPG, PNG, WebP o AVIF de hasta 5 MB. Si ya aplicaste las dos primeras migraciones, ejecuta únicamente `202611250003_catalog_images.sql` en el SQL Editor del proyecto QCACHAPA. Esta migración crea el bucket público de imágenes y reserva las escrituras a administradores activos. Los archivos se publican al guardar el formulario.
-6. Crea categorías y productos reales antes de habilitar pedidos web. Completa el flujo de validación con cuentas distintas de caja y cocina antes de abrirlo al público.
+6. Crea categorías y productos reales antes de habilitar pedidos web. Completa el flujo de validación con cuentas distintas de caja y cocina antes de abrirlo al público. Si ya tienes el proyecto configurado, ejecuta `202611250004_menu_starters.sql` para agregar categorías y platos de ejemplo como borradores. Pon sus precios y actívalos desde **Menú** cuando estén listos.
 
 ## Netlify
 

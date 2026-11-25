@@ -25,6 +25,19 @@ export function Store({catalog,source='web',onPlaced,cartDialog,checkout=false}:
   const visible = products.filter(product => product.available && (!category || product.category_id === category)
     && (product.name + ' ' + product.description).toLocaleLowerCase().includes(query.toLocaleLowerCase().trim()));
 
+  const groups = source === 'web'
+    ? categories.filter(group => visible.some(item => item.category_id === group.id)).map(group => ({
+      ...group, products:visible.filter(item => item.category_id === group.id),
+    }))
+    : [];
+  const otherProducts = source === 'web' ? visible.filter(item => !categories.some(group => group.id === item.category_id)) : visible;
+  const productCard = (product:Product, grouped=false) => <article className="product" key={product.id}>
+    {product.image_url && <img src={product.image_url} alt="" width={800} height={500} loading="lazy"/>}
+    <div>{grouped ? <h4>{product.name}</h4> : <h3>{product.name}</h3>}{product.description && <p>{product.description}</p>}
+      <div className="row"><strong>{money(product.price)}</strong><button disabled={busy || (source === 'web' && !business.accepting_orders)} onClick={() => add(product)}>Agregar</button></div>
+    </div>
+  </article>;
+
   function update(lines:CartLine[]) {
     const next = {key:crypto.randomUUID(),lines};
     setDraft(next);
@@ -140,13 +153,12 @@ export function Store({catalog,source='web',onPlaced,cartDialog,checkout=false}:
           </div>
         </div>
         {catalog.error && <p role="alert" className="notice">{catalog.error}</p>}
-        {catalog.loading ? <p>Cargando menú…</p> : visible.length ? <div className="products">
-          {visible.map(product => <article className="product" key={product.id}>
-            {product.image_url && <img src={product.image_url} alt={product.name} width={800} height={500} loading="lazy"/>}
-            <div><h3>{product.name}</h3><p>{product.description}</p>
-              <div className="row"><strong>{money(product.price)}</strong><button disabled={busy || (source === 'web' && !business.accepting_orders)} onClick={() => add(product)}>Agregar</button></div>
-            </div>
-          </article>)}
+        {catalog.loading ? <p>Cargando menú…</p> : visible.length ? <div className="catalog-sections">
+          {groups.map(group => <section className="catalog-section" key={group.id} aria-label={group.name}>
+            <h3>{group.name}</h3>
+            <div className="products">{group.products.map(product => productCard(product,true))}</div>
+          </section>)}
+          {otherProducts.length > 0 && <div className="products">{otherProducts.map(product => productCard(product))}</div>}
         </div> : <div className="empty">{query || category ? 'No encontramos productos con estos filtros.' : 'El menú todavía no está disponible.'}</div>}
       </div>
       {cartDialog ? <dialog className="portal-cart" ref={cartDialog} aria-labelledby="portal-cart-title" onClick={event => {

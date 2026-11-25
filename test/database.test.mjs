@@ -36,7 +36,7 @@ before(async () => {
     alter table storage.objects enable row level security;
     create publication supabase_realtime;
   `);
-  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql']) {
+  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql','202611250004_menu_starters.sql']) {
     await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   }
   for (const [id,role] of [[admin,'admin'],[cashier,'cashier'],[kitchen,'kitchen'],[secondAdmin,'admin']]) {
@@ -196,4 +196,17 @@ test('Storage autoriza imágenes de administradores y protege archivos de otras 
   assert.equal((await db.query("delete from storage.objects where name=$1",[admin+'/foto.png'])).affectedRows,0);
   await acting(admin);
   assert.equal((await db.query("delete from storage.objects where name=$1",[admin+'/foto.png'])).affectedRows,1);
+});
+
+test('los platos iniciales quedan como borradores editables del menú', async () => {
+  await acting(admin);
+  const rows = (await db.query(`
+    select products.name, products.price, products.available
+    from products join categories on categories.id = products.category_id
+    where categories.name in ('Almuerzos','Cachapas','Hamburguesas','Perros calientes')
+  `)).rows;
+  assert.equal(rows.length,7);
+  assert.ok(rows.every(product => !product.available && Number(product.price) === 0));
+  await acting(null);
+  assert.equal(await value("select count(*) value from products where name='Pabellón criollo'"),0);
 });
