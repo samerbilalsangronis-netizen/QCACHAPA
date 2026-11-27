@@ -1,0 +1,40 @@
+const names:Record<string,string> = {
+  'cachapa 4 quesos':'cuatro-quesos',
+  'cachapa media zuliana':'media-zuliana',
+  'cachapa andina':'andina',
+  'q molleja':'molleja',
+  'cachapa con chuleta ahumada':'chuleta',
+  'cachapa de carne o pollo':'carne-pollo',
+  'cachapa de cochino frito':'cochino',
+  'cachapa mixta':'mixta',
+  'cachapa hawaiana':'hawaiana',
+  'cachapa burger':'cachapa-burger',
+  'cachapa barquisimetana':'barquisimetana',
+  'cachapa guayanesa':'guayanesa',
+  'cachapa sifrina de pollo o carne':'sifrina',
+  'arepa de carne o pollo':'arepa-carne-pollo',
+  'arepa mixta':'arepa-mixta',
+  'patacon de carne o pollo mechado':'patacon-carne-pollo',
+  'patacon de cochino frito':'patacon-cochino',
+  'patacon mixto':'patacon-mixto',
+  'q hamburguesa':'hamburguesa-q',
+  'hamburguesa junior':'hamburguesa-junior',
+  'perro caliente':'perro-caliente',
+  'perro caliente clasico':'perro-caliente',
+  'tequenos (10 unidades)':'tequenos',
+  refrescos:'refrescos',
+  nestea:'nestea',
+  'jugos naturales':'jugos',
+  malta:'malta',
+  merengadas:'merengadas',
+  toddy:'toddy',
+  agua:'agua',
+  cerveza:'cerveza',
+  'tobo de cerveza':'tobo',
+  'vaso de sangria':'sangria',
+};
+
+export function catalogPhoto(normalizedName:string) {
+  const key = normalizedName.replace(/[’']/g,'');
+  return Object.hasOwn(names,key) ? '/menu/'+names[key]+'.webp' : null;
+}

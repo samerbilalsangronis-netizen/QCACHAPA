@@ -43,7 +43,7 @@
   content: ''; flex: none; width: .35rem; height: 1.3rem; border-radius: 4px; background: #d89937;
 }
 .portal .storefront-carta .catalog-sections .products {
-  grid-template-columns: repeat(auto-fit,minmax(min(100%,345px),1fr));
+  grid-template-columns: repeat(auto-fill,minmax(min(100%,345px),1fr));
   gap: .7rem;
 }
 .portal .storefront-carta .catalog-sections .product {
@@ -81,8 +81,7 @@
   .storefront-carta .catalog-layout { grid-template-columns: minmax(0,1fr); gap: 1.2rem; }
   .portal .storefront-carta .menu-controls { position: static; padding: .7rem; }
   .portal .storefront-carta .menu-controls .chips {
-    display: flex; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain;
-    gap: .35rem; scrollbar-width: thin; padding: 3px;
+    display: flex; flex-wrap: wrap; gap: .35rem; padding: 3px;
   }
   .portal .storefront-carta .menu-controls .chips button { flex: 0 0 auto; background: #fff9e8; }
   .portal .storefront-carta .menu-controls .chips button[aria-pressed=true] { background: #35452c; }

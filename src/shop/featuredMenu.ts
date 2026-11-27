@@ -1,4 +1,5 @@
 import type {Product} from '../model';
+import {catalogPhoto} from './catalogPhotos';
 
 export type FeaturedDish = {
   name:string;
@@ -42,8 +43,9 @@ export function referencePhoto(dish:FeaturedDish, product?:Product) {
 }
 
 export function menuPhoto(product:Product) {
+  if (product.image_url && !legacyPhotos.has(product.image_url)) return product.image_url;
   const name = normalize(product.name);
   const dish = [...lunchDishes,...cachapaDishes].find(item => [item.name,...(item.aliases ?? [])]
     .some(label => normalize(label) === name));
-  return dish ? referencePhoto(dish,product) : product.image_url;
+  return dish ? referencePhoto(dish) : catalogPhoto(name) ?? product.image_url;
 }

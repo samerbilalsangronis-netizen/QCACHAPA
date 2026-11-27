@@ -1,4 +1,4 @@
-const CACHE = 'qcachapa-shell-10';
+const CACHE = 'qcachapa-shell-11';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -20,11 +20,12 @@ self.addEventListener('fetch', event => {
   const {request} = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  const localAsset = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/menu/');
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(async () => (await caches.match('/')) ?? Response.error()));
-  } else if (url.pathname.startsWith('/assets/') || /\/(logo-qcachapas\.webp|(?:almuerzo|plato)-[a-z]+\.webp|cachapa(?:-portada(?:-movil)?)?\.webp|manifest.webmanifest|icon-\d+.png)$/.test(url.pathname)) {
+  } else if (localAsset || /\/(logo-qcachapas\.webp|(?:almuerzo|plato)-[a-z]+\.webp|cachapa(?:-portada(?:-movil)?)?\.webp|manifest.webmanifest|icon-\d+.png)$/.test(url.pathname)) {
     event.respondWith((async () => {
-      if (!url.pathname.startsWith('/assets/')) {
+      if (!localAsset) {
         try { return await fetch(request); } catch { return (await caches.match(request.url,{ignoreVary:true})) ?? Response.error(); }
       }
       const existing = await caches.match(request.url,{ignoreVary:true});

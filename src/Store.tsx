@@ -1,6 +1,7 @@
 import {useEffect,useImperativeHandle,useRef,useState,type FormEvent,type RefObject} from 'react';
 import ProductChoice,{type Choice} from './shop/ProductChoice';
 import {menuPhoto} from './shop/featuredMenu';
+import {publicMenuGroups} from './shop/catalogGroups';
 import {configuredPrice,optionLabel,selectedOptions} from './productOptions';
 import './shop/store-dialogs.css';
 import {type Catalog} from './data';
@@ -35,15 +36,13 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
   const total = draft.lines.reduce((sum,line) => sum + priceFor(line) * line.quantity,0);
   const hasUnavailable = draft.lines.some(line => !byId.get(line.product_id)?.available || optionsChanged(line));
   const count = draft.lines.reduce((sum,line) => sum + line.quantity,0);
-  const visible = products.filter(product => product.available && (!category || product.category_id === category)
-    && (product.name + ' ' + product.description).toLocaleLowerCase().includes(query.toLocaleLowerCase().trim()));
+  const groups = source === 'web' ? publicMenuGroups(categories,products) : [];
+  const selectedGroup = groups.find(group => group.id === category) ?? groups.find(group => group.id === 'cachapas') ?? groups[0];
+  const search = query.toLocaleLowerCase('es').trim();
+  const visible = (source === 'web' ? selectedGroup?.products ?? [] : products.filter(product =>
+    product.available && (!category || product.category_id === category)))
+    .filter(product => (product.name + ' ' + product.description).toLocaleLowerCase('es').includes(search));
 
-  const groups = source === 'web'
-    ? categories.filter(group => visible.some(item => item.category_id === group.id)).map(group => ({
-      ...group, products:visible.filter(item => item.category_id === group.id),
-    }))
-    : [];
-  const otherProducts = source === 'web' ? visible.filter(item => !categories.some(group => group.id === item.category_id)) : visible;
   const productCard = (product:Product, grouped=false) => {
     const photo = source === 'web' ? menuPhoto(product) : product.image_url;
     return <article className="product" data-menu-reveal={source === 'web' ? '' : undefined} key={product.id}>
@@ -104,7 +103,7 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
   useImperativeHandle(actionsRef,() => ({
     browseCategory(next) {
       setQuery('');
-      setCategory(next);
+      setCategory(source === 'web' ? groups.find(group => group.categoryIds.includes(next))?.id ?? '' : next);
     },
     orderFeatured(product) {
       if (!product.available || !business.accepting_orders || !canConfirm || busy) return;
@@ -128,6 +127,7 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
 
   function chooseCategory(next:string) {
     setCategory(next);
+    if (source === 'web') setQuery('');
     if (source === 'web' && menu.current && menu.current.getBoundingClientRect().top < -100) {
       menu.current.scrollIntoView({block:'start'});
     }
@@ -212,22 +212,26 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
     <div className="store-grid">
       <div className="catalog-layout">
         <div className="menu-controls" data-menu-reveal={source === 'web' ? '' : undefined}>
-          <input type="search" name="productos" aria-label="Buscar productos" placeholder="Buscar en el menú…" value={query} onChange={e => setQuery(e.target.value)}/>
+          <input type="search" name="productos" aria-label={source === 'web' ? 'Buscar productos en esta categoría' : 'Buscar productos'}
+            placeholder={source === 'web' ? 'Buscar producto…' : 'Buscar en el menú…'} value={query} onChange={e => setQuery(e.target.value)}/>
           {source === 'web' && <p className="catalog-index-label">Categorías</p>}
           <div className="chips" role="group" aria-label="Categorías">
-            <button aria-pressed={!category} onClick={() => chooseCategory('')}>Todo el menú</button>
-            {categories.map(item => <button key={item.id} aria-pressed={category === item.id} onClick={() => chooseCategory(item.id)}>{item.name}</button>)}
+            {source === 'web' ? groups.map(group => <button type="button" key={group.id}
+              aria-pressed={selectedGroup?.id === group.id} onClick={() => chooseCategory(group.id)}>{group.name}</button>) : <>
+              <button type="button" aria-pressed={!category} onClick={() => chooseCategory('')}>Todo el menú</button>
+              {categories.map(item => <button type="button" key={item.id} aria-pressed={category === item.id}
+                onClick={() => chooseCategory(item.id)}>{item.name}</button>)}
+            </>}
           </div>
         </div>
         <div className="catalog-results">
           {catalog.error && <p role="alert" className="notice">{catalog.error}</p>}
           {catalog.loading ? <p role="status">Cargando menú…</p> : visible.length ? <div className="catalog-sections">
-            {groups.map(group => <section className="catalog-section" key={group.id} aria-label={group.name}>
-              <h3 data-menu-reveal="">{group.name}</h3>
-              <div className="products">{group.products.map(product => productCard(product,true))}</div>
-            </section>)}
-            {otherProducts.length > 0 && <div className="products">{otherProducts.map(product => productCard(product))}</div>}
-          </div> : <div className="empty">{query || category ? 'No encontramos productos con estos filtros.' : 'El menú todavía no está disponible.'}</div>}
+            {source === 'web' && selectedGroup ? <section className="catalog-section" key={selectedGroup.id} aria-label={selectedGroup.name}>
+              <h3 data-menu-reveal="">{selectedGroup.name}</h3>
+              <div className="products">{visible.map(product => productCard(product,true))}</div>
+            </section> : <div className="products">{visible.map(product => productCard(product))}</div>}
+          </div> : <div className="empty">{search || (source !== 'web' && category) ? 'No encontramos productos con estos filtros.' : 'El menú todavía no está disponible.'}</div>}
         </div>
       </div>
       {cartDialog ? <dialog className="portal-cart" ref={cartDialog} aria-labelledby="portal-cart-title" onClick={event => {
