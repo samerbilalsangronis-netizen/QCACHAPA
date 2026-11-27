@@ -2,6 +2,8 @@ import {useEffect,useRef,useState,type FormEvent} from 'react';
 import type {Catalog} from './data';
 import {db,money,type Category,type Product} from './model';
 import ImagePicker from './ImagePicker';
+import ProductOptionsEditor from './ProductOptionsEditor';
+import type {ProductOption} from './productOptions';
 import {saveCatalogImages} from './catalogImages';
 import './menu-editor.css';
 
@@ -17,6 +19,7 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
   const [query,setQuery] = useState('');
   const [availability,setAvailability] = useState<Availability>('all');
   const [editor,setEditor] = useState<Editor|null>(null);
+  const [options,setOptions] = useState<ProductOption[]>([]);
   const [busy,setBusy] = useState(false);
   const [message,setMessage] = useState('');
   const [error,setError] = useState('');
@@ -41,6 +44,7 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
   function open(next:Editor) {
     setError('');
     setMessage('');
+    setOptions(next.kind === 'product' ? next.item?.options ?? [] : []);
     setEditor(next);
   }
 
@@ -88,7 +92,12 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
     }
 
     const id = editor.item?.id;
+    if (options.some(option => !option.label.trim())) {
+      setError('Escribe un nombre para cada opción.');
+      return;
+    }
     const row = {
+      ...(options.length || editor.item?.options ? {options:options.map(option => ({...option,label:option.label.trim()}))} : {}),
       name,
       category_id:String(data.get('category_id')),
       price:Number(data.get('price')),
@@ -185,6 +194,7 @@ export default function MenuEditor({catalog}:{catalog:Catalog}) {
               <label>Precio en USD<input type="number" name="price" min="0" max="9999999999.99" step=".01" defaultValue={editor.item?.price} required/></label>
               <label>Preparación en minutos<input type="number" name="prep_minutes" min="1" max="1440" defaultValue={editor.item?.prep_minutes ?? 20} required/></label>
             </div>
+            <ProductOptionsEditor options={options} onChange={setOptions}/>
             <ImagePicker name="image_url" label="Foto del producto" current={editor.item?.image_url}/>
             <label>Descripción<textarea name="description" defaultValue={editor.item?.description} maxLength={2000}/></label>
             <label className="check"><input name="available" type="checkbox" defaultChecked={editor.item?.available ?? true}/> Disponible para pedidos</label>

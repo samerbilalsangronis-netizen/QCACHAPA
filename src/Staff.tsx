@@ -8,6 +8,7 @@ import {isAdminView,isCashierView,staffNavigation,staffRoute,staffRoutes,type St
 import './staff.css';
 
 const Admin = lazy(() => import('./Admin'));
+const TableService = lazy(() => import('./TableService'));
 
 function AccessFrame({business,children}:{business:Business;children:ReactNode}) {
   return <main className="staff staff-access">
@@ -176,6 +177,7 @@ export default function Staff() {
           <Suspense fallback={<p role="status">Cargando panel…</p>}>
             {section && isAdminView(section) && <Admin catalog={catalog} user={session.user.id} section={section}/>}
             {section && isCashierView(section) && <Cashier catalog={catalog} user={session.user.id} admin={role === 'admin'} view={section} navigate={navigate}/>}
+            {section === 'tables' && role && <TableService catalog={catalog} role={role}/>}
             {section === 'kitchen' && <Kitchen timezone={catalog.business.timezone}/>}
           </Suspense>
         </>}

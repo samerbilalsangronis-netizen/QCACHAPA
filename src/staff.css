@@ -214,3 +214,12 @@
   cursor: pointer; min-height: 44px; padding-block: .65rem; color: #753b28; font-size: .87rem; font-weight: 680;
 }
 .order-cancel summary:focus-visible { outline: 3px solid #946019; outline-offset: 3px; border-radius: 5px; }
+
+.table-service-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,155px),1fr)); gap: .65rem; margin-block: 1rem; }
+.staff .table-service-card { display: grid; justify-items: start; gap: .25rem; padding: .85rem; text-align: left; min-height: 70px; }
+.table-service-card span, .table-orders p { font-size: .86rem; }
+.table-account { margin-top: .9rem; }
+.table-account .section-head { margin-bottom: .6rem; }
+.table-balance { background: #e9eddd; padding: .7rem; border-radius: 9px; }
+.table-orders { padding: 0; margin: .6rem 0; list-style: none; }
+.table-orders li { padding-block: .45rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); }

@@ -36,7 +36,7 @@ before(async () => {
     alter table storage.objects enable row level security;
     create publication supabase_realtime;
   `);
-  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql','202611250004_menu_starters.sql']) {
+  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql','202611250004_menu_starters.sql','202611250005_product_options.sql','202611260001_table_service.sql']) {
     await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   }
   for (const [id,role] of [[admin,'admin'],[cashier,'cashier'],[kitchen,'kitchen'],[secondAdmin,'admin']]) {
@@ -209,4 +209,144 @@ test('los platos iniciales quedan como borradores editables del menú', async ()
   assert.ok(rows.every(product => !product.available && Number(product.price) === 0));
   await acting(null);
   assert.equal(await value("select count(*) value from products where name='Pabellón criollo'"),0);
+});
+
+test('el servidor valida opciones, calcula recargos y conserva el pedido histórico', async () => {
+  const choices = [
+    {id:'queso',label:'Queso',kind:'extra',price:1.25},
+    {id:'tomate',label:'Tomate',kind:'remove',price:0},
+  ];
+  await acting(admin);
+  await db.query('update products set options=$1 where id=$2',[JSON.stringify(choices),product]);
+  await assert.rejects(db.query('update products set options=$1 where id=$2',
+    [JSON.stringify([{...choices[1],price:4}]),product]),{code:'23514'});
+  await db.query("select change_shift('open',0)");
+  const placeConfigured = (ids,price) =>
+    value("select place_order($1,'pos','pickup','Ensayo',null,null,null,$2) value",
+      [crypto.randomUUID(),JSON.stringify([{product_id:product,quantity:2,notes:'Bien cocido',expected_price:price,option_ids:ids}])]);
+  await assert.rejects(placeConfigured(['inventada'],5.55),/opciones del producto cambiaron/);
+  await assert.rejects(placeConfigured(['queso','queso'],6.8),/opciones del producto cambiaron/);
+  await assert.rejects(placeConfigured(['queso','tomate'],5.55),/Cambió el precio/);
+  const sale = await placeConfigured(['queso','tomate'],6.8);
+  assert.equal(sale.total,13.6);
+  const order = await value('select id value from orders where number=$1',[sale.number]);
+  await db.query("update products set options='[]' where id=$1",[product]);
+  assert.deepEqual(await value('select options value from order_lines where order_id=$1',[order]),choices);
+  assert.equal(await value('select notes value from order_lines where order_id=$1',[order]),'Extra: Queso, Sin Tomate\nBien cocido');
+  await db.query("select move_order($1,'confirmed')",[order]);
+  await acting(kitchen);
+  assert.equal(await value("select lines->0->>'notes' value from kitchen_tickets where id=$1",[order]),'Extra: Queso, Sin Tomate\nBien cocido');
+});
+
+test('tres mozos llevan cuentas separadas y cocina recibe cada comanda sin intervención de caja', async () => {
+  const waiters = Array.from({length:3},() => crypto.randomUUID());
+  const tables = [];
+  const sessions = [];
+  const orderIds = [];
+  await db.exec('reset role');
+  for (const id of waiters) {
+    await db.query('insert into auth.users values($1)',[id]);
+    await db.query("insert into staff(id,role) values($1,'waiter')",[id]);
+  }
+  await acting(admin);
+  for (let i=1;i<=3;i++) tables.push(await value('insert into dining_tables(name) values($1) returning id value',['Mesa '+i]));
+  const open = table => value('select open_table_session($1) value',[table]);
+  const overview = () => value('select table_service_overview() value');
+  const submit = (session,key=crypto.randomUUID()) => value(
+    "select place_order($1,'floor','table',null,null,$2,null,$3) value",
+    [key,session,JSON.stringify([{product_id:product,quantity:1,expected_price:5.55,notes:'Sin ensalada'}])],
+  );
+  for (const [index,waiter] of waiters.entries()) {
+    await acting(waiter);
+    assert.equal((await overview()).length,3);
+    if (index) await assert.rejects(open(tables[0]),/ya abrió/);
+    sessions[index] = await open(tables[index]);
+    assert.equal(await open(tables[index]),sessions[index]);
+    const key = crypto.randomUUID();
+    const order = await submit(sessions[index],key);
+    assert.deepEqual(await submit(sessions[index],key),order);
+    assert.equal(order.total,5.55);
+    const view = await overview();
+    assert.equal(view.filter(table => table.session).length,1);
+    assert.equal(view[index].session.orders[0].status,'confirmed');
+    if (index) await assert.rejects(submit(sessions[0]),/Sin permiso sobre esta cuenta/);
+    await assert.rejects(db.query("select close_table_session($1,'cash')",[sessions[index]]),/Sin permiso/);
+    orderIds[index] = view[index].session.orders[0].id;
+  }
+  await acting(admin);
+  assert.equal((await overview()).filter(table => table.session).length,3);
+  await assert.rejects(db.query("select close_table_session($1,'cash')",[sessions[0]]),/comandas pendientes/);
+
+  await acting(kitchen);
+  assert.equal((await db.query("select * from kitchen_tickets where source='floor'")).rows.length,3);
+  assert.equal(await value("select lines->0->>'notes' value from kitchen_tickets where id=$1",[orderIds[0]]),'Sin ensalada');
+  await db.query("select move_order($1,'preparing')",[orderIds[0]]);
+  await db.query("select move_order($1,'ready')",[orderIds[0]]);
+  await acting(cashier);
+  await db.query("select move_order($1,'delivered')",[orderIds[0]]);
+  await assert.rejects(db.query("select close_table_session($1,'cash')",[sessions[0]]),/Abre un turno/);
+  assert.equal((await overview())[0].occupied,true);
+  await db.query("select change_shift('open',0)");
+  await db.query("select close_table_session($1,'cash')",[sessions[0]]);
+  assert.equal(Number(await value('select amount value from payments where order_id=$1',[orderIds[0]])),5.55);
+  assert.equal((await overview())[0].occupied,false);
+  await acting(waiters[0]);
+  await assert.rejects(submit(sessions[0]),/cuenta de esta mesa está cerrada/);
+  assert.notEqual(await open(tables[0]),sessions[0]);
+});
+
+test('el menú impreso incorpora sus 23 precios y conserva los productos y ajustes existentes', async () => {
+  await db.exec('reset role');
+  const traditional = await value("select id value from products where name='Cachapa con queso'");
+  const edited = await value(`
+    insert into products(category_id,name,description,price,available,image_url)
+    select id,'Chuleta ahumada','Descripción del negocio',11,false,'/foto-real.webp'
+    from categories where name='Cachapas' returning id value
+  `);
+  const menuSql = await readFile(new URL('../supabase/migrations/202611270001_original_menu.sql',import.meta.url),'utf8');
+  await db.exec(menuSql);
+  await db.exec(menuSql);
+  await acting(admin);
+  const rows = (await db.query(`
+    select p.name,p.price from products p join categories c on c.id=p.category_id
+    where c.name in ('Cachapas','Cachapas de autor','Cachapas especiales','Arepas de maíz','Patacones','Hamburguesas','Perros calientes','Tequeños')
+  `)).rows;
+  assert.equal(rows.length,23);
+  assert.deepEqual(Object.fromEntries(rows.map(({name,price}) => [name,Number(price)])),{
+    'Cachapa con queso':5, 'Cachapa 4 quesos':6, 'Cachapa Media Zuliana':6, 'Cachapa Andina':6,
+    'Q’ Molleja':10, 'Cachapa con chuleta ahumada':9, 'Cachapa de carne o pollo':8, 'Cachapa de cochino frito':9,
+    'Cachapa mixta':10, 'Cachapa hawaiana':10, 'Cachapa Burger':8, 'Cachapa barquisimetana':7,
+    'Cachapa guayanesa':7, 'Cachapa sifrina de pollo o carne':9, 'Arepa de carne o pollo':7, 'Arepa mixta':8,
+    'Patacón de carne o pollo mechado':8, 'Patacón de cochino frito':8, 'Patacón mixto':10,
+    'Q’ Hamburguesa':10, 'Hamburguesa Junior':7, 'Perro caliente':5, 'Tequeños (10 unidades)':5,
+  });
+  assert.equal(await value("select id value from products where name='Cachapa con queso'"),traditional);
+  assert.equal(await value('select available value from products where id=$1',[traditional]),true);
+  assert.equal(await value('select description value from products where id=$1',[edited]),'Descripción del negocio');
+  assert.equal(await value('select image_url value from products where id=$1',[edited]),'/foto-real.webp');
+  assert.equal(await value('select available value from products where id=$1',[edited]),false);
+  assert.equal(await value("select count(*) value from products p join categories c on c.id=p.category_id where c.name='Almuerzos'"),4);
+  await acting(null);
+  assert.equal(Number(await value("select price value from products where name='Q’ Hamburguesa'")),10);
+  assert.equal(await value('select id value from products where id=$1',[edited]),undefined);
+});
+
+test('la segunda hoja incorpora solo bebidas y conserva los precios que ya están configurados', async () => {
+  await db.exec('reset role');
+  await db.exec("update products set price=2,available=true where name='Agua'");
+  const menuSql = await readFile(new URL('../supabase/migrations/202611270001_original_menu.sql',import.meta.url),'utf8');
+  await db.exec(menuSql);
+  await acting(admin);
+  const drinks = (await db.query(`
+    select p.name,p.price,p.available from products p join categories c on c.id=p.category_id where c.name='Bebidas'
+  `)).rows;
+  assert.deepEqual(drinks.map(row => row.name).sort(),[
+    'Agua','Cerveza','Jugos naturales','Malta','Merengadas','Nestea','Refrescos','Tobo de cerveza','Toddy','Vaso de sangría',
+  ].sort());
+  assert.equal(Number(drinks.find(row => row.name==='Agua').price),2);
+  assert.ok(drinks.filter(row => row.name!=='Agua').every(row => !row.available));
+  assert.equal(await value("select count(*) value from categories where lower(name)='adicionales'"),0);
+  await acting(null);
+  assert.equal(await value("select name value from products where name='Agua'"),'Agua');
+  assert.equal(await value("select name value from products where name='Merengadas'"),undefined);
 });

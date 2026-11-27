@@ -1,0 +1,94 @@
+.portal .storefront-carta { padding-block: clamp(2.5rem,7vw,5.4rem); }
+.portal .storefront-carta .section-head {
+  margin-bottom: 1.4rem;
+  padding-bottom: 1.15rem;
+  box-shadow: inset 0 -2px #e4d3af;
+}
+.portal .storefront-carta .section-head h2 { font-size: clamp(3.1rem,8vw,6rem); }
+.storefront-carta .catalog-layout {
+  display: grid;
+  grid-template-columns: clamp(180px,21vw,225px) minmax(0,1fr);
+  align-items: start;
+  gap: clamp(1.15rem,3.7vw,3.7rem);
+}
+.storefront-carta .catalog-results { min-width: 0; }
+.portal .storefront-carta .menu-controls {
+  position: sticky; top: 1rem;
+  display: grid; gap: .7rem;
+  margin-bottom: 0; padding: .85rem;
+  border-radius: 16px; background: #eee7d1;
+}
+.portal .storefront-carta .menu-controls input {
+  min-width: 0; width: 100%; background: #fffcf0;
+  border: 0; border-radius: 9px;
+}
+.storefront-carta .catalog-index-label {
+  color: #575440; font-size: .79rem; margin: .28rem .4rem 0; font-weight: 750;
+}
+.portal .storefront-carta .menu-controls .chips { display: grid; gap: .22rem; }
+.portal .storefront-carta .menu-controls .chips button {
+  justify-content: flex-start; text-align: left;
+  border: 0; border-radius: 9px; color: #333925; background: transparent;
+  transition: background-color .2s ease,color .2s ease;
+}
+.portal .storefront-carta .menu-controls .chips button:hover { background: #e5dcc2; filter: none; }
+.portal .storefront-carta .menu-controls .chips button[aria-pressed=true] { background: #35452c; color: #fffaf0; }
+.storefront-carta .catalog-sections { display: grid; gap: clamp(1.65rem,5vw,3.4rem); }
+.storefront-carta .catalog-section > h3 {
+  display: flex; align-items: center; gap: .65rem;
+  color: #35452c; margin-bottom: .8rem;
+  font: 800 clamp(2.05rem,4.5vw,3.5rem)/.96 'Barlow Condensed',sans-serif;
+}
+.storefront-carta .catalog-section > h3::before {
+  content: ''; flex: none; width: .35rem; height: 1.3rem; border-radius: 4px; background: #d89937;
+}
+.portal .storefront-carta .catalog-sections .products {
+  grid-template-columns: repeat(auto-fit,minmax(min(100%,345px),1fr));
+  gap: .7rem;
+}
+.portal .storefront-carta .catalog-sections .product {
+  display: grid;
+  align-items: stretch;
+  border-radius: 13px; border: 0; background: #fffdf5; box-shadow: 0 5px 16px #3938250d;
+  animation: none; transition: background-color .2s ease,box-shadow .25s ease;
+}
+.portal .storefront-carta .catalog-sections .product:has(> img) { grid-template-columns: minmax(86px,30%) minmax(0,1fr); }
+.portal .storefront-carta .catalog-sections .product > img {
+  min-height: 100%; height: 100%; width: 100%; aspect-ratio: auto; object-fit: cover;
+}
+.portal .storefront-carta .catalog-sections .product > div {
+  display: flex; flex-direction: column; min-width: 0; gap: .45rem; padding: .85rem;
+}
+.portal .storefront-carta .catalog-sections .product :is(h3,h4) {
+  font: 800 clamp(1.4rem,2.1vw,1.85rem)/1.02 'Barlow Condensed',sans-serif;
+  color: #343c29; overflow-wrap: anywhere;
+}
+.portal .storefront-carta .catalog-sections .product p { color: #5a5443; font-size: .88rem; }
+.portal .storefront-carta .catalog-sections .product .row { margin-top: auto; flex-wrap: wrap; gap: .35rem; padding-top: .3rem; }
+.portal .storefront-carta .catalog-sections .product .row strong { font-variant-numeric: tabular-nums; }
+.portal .storefront-carta .catalog-sections .product button {
+  background: #eab950; color: #252819; border-radius: 8px; padding: .42rem .72rem;
+}
+.portal .storefront-carta .menu-revealed,
+.portal .storefront-carta .catalog-sections .product.menu-revealed { animation: menu-arrive .58s cubic-bezier(.22,.75,.27,1) both; }
+.portal .storefront-carta .product.menu-revealed:nth-child(even) { animation-delay: .065s; }
+@media(hover:hover) and (pointer:fine) {
+  .portal .storefront-carta .catalog-sections .product:hover { background: #fff9e7; box-shadow: 0 10px 23px #39382518; }
+}
+@keyframes menu-arrive { from { opacity: .22; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+@media(max-width: 760px) {
+  .storefront-carta .catalog-layout { grid-template-columns: minmax(0,1fr); gap: 1.2rem; }
+  .portal .storefront-carta .menu-controls { position: static; padding: .7rem; }
+  .portal .storefront-carta .menu-controls .chips {
+    display: flex; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain;
+    gap: .35rem; scrollbar-width: thin; padding: 3px;
+  }
+  .portal .storefront-carta .menu-controls .chips button { flex: 0 0 auto; background: #fff9e8; }
+  .portal .storefront-carta .menu-controls .chips button[aria-pressed=true] { background: #35452c; }
+}
+@media(prefers-reduced-motion: reduce) {
+  .portal .storefront-carta .menu-revealed,
+.portal .storefront-carta .catalog-sections .product.menu-revealed { animation: none; }
+  .portal .storefront-carta .menu-controls .chips button,.portal .storefront-carta .catalog-sections .product { transition: none; }
+}

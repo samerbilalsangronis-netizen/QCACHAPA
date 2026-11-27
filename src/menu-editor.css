@@ -198,3 +198,6 @@
 .business-setting-group { display: grid; gap: .8rem; padding-block: .4rem .9rem; }
 .business-setting-group + .business-setting-group { border-top: 1px solid #e7e9df; padding-top: .95rem; }
 .business-setting-group h2 { margin: 0; }
+.product-options-editor { border: 0; padding: .85rem; border-radius: 14px; background: #edf0e6; }
+.product-options-editor legend { font-weight: 750; }
+.product-option-editor-row { display: grid; gap: .5rem; align-items: end; grid-template-columns: repeat(auto-fit,minmax(min(100%,140px),1fr)); }
