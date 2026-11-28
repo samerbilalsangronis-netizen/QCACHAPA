@@ -5,7 +5,7 @@ import MenuEditor from './MenuEditor';
 import {staffRoutes,type AdminView} from './staffRoutes';
 import ImagePicker from './ImagePicker';
 import {saveCatalogImages} from './catalogImages';
-import type {CheckoutSettings} from './shop/checkoutModel';
+import {validDeliveryFee,type CheckoutSettings} from './shop/checkoutModel';
 
 const client = () => db!;
 const entryTypes = ['note','task','event','incident'];
@@ -76,23 +76,36 @@ function useSave(refresh:()=>Promise<void>) {
 function Settings({catalog}:{catalog:Catalog}) {
   const {business} = catalog;
   const {message,busy,save} = useSave(catalog.refresh);
-  const [validation,setValidation] = useState('');
+  const [validation,setValidation] = useState<{field:string;message:string}|null>(null);
   const fields:[keyof Business,string,string?][] = [
     ['name','Nombre comercial'],['slogan','Eslogan'],['address','Dirección'],['whatsapp','WhatsApp','tel'],
   ];
   return <form className="panel business-settings" key={JSON.stringify(business)} onSubmit={event => {
     event.preventDefault();
-    setValidation('');
-    const data = new FormData(event.currentTarget);
+    setValidation(null);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const payload = Object.fromEntries(fields.map(([field]) => [field,data.get(field) || null]));
     const numeric = (field:string) => data.get(field) ? Number(data.get(field)) : null;
     let checkout:CheckoutSettings|undefined;
     if (business.checkout) {
+      const deliveryEnabled = data.get('delivery_enabled')==='on';
+      const deliveryFee = numeric('delivery_fee');
       const latitude = numeric('delivery_latitude');
       const longitude = numeric('delivery_longitude');
-      if ((latitude===null)!==(longitude===null)) {setValidation('Completa la latitud y la longitud del local.');return;}
+      if (deliveryEnabled && !validDeliveryFee(deliveryFee)) {
+        setValidation({field:'delivery_fee',message:'Ingresa un costo mayor que cero para habilitar el delivery.'});
+        form.querySelector<HTMLInputElement>('[name="delivery_fee"]')?.focus();
+        return;
+      }
+      if ((latitude===null)!==(longitude===null)) {
+        const field = latitude===null ? 'delivery_latitude' : 'delivery_longitude';
+        setValidation({field,message:'Completa la latitud y la longitud del local.'});
+        form.querySelector<HTMLInputElement>(`[name="${field}"]`)?.focus();
+        return;
+      }
       checkout = {
-        delivery_enabled:data.get('delivery_enabled')==='on',delivery_fee:numeric('delivery_fee') ?? 0,
+        delivery_enabled:deliveryEnabled,delivery_fee:deliveryFee ?? 0,
         schedule_enabled:data.get('schedule_enabled')==='on',terminal_enabled:data.get('terminal_enabled')==='on',
         latitude,longitude,ves_rate:numeric('ves_rate'),
         transfer_instructions:String(data.get('transfer_instructions') ?? '').trim(),
@@ -118,17 +131,27 @@ function Settings({catalog}:{catalog:Catalog}) {
         <h2 id="business-hours-title">Pedidos y horario</h2>
         <label>Horario visible en la tienda<input name="hours" defaultValue={business.hours ?? ''}/></label>
         <label className="check"><input name="accepting_orders" type="checkbox" defaultChecked={business.accepting_orders}/> Aceptar pedidos en línea</label>
+        {business.checkout && <label className="check"><input name="schedule_enabled" type="checkbox" defaultChecked={business.checkout.schedule_enabled}/> Aceptar pedidos programados</label>}
       </section>
-      {business.checkout && <section className="business-setting-group" aria-labelledby="business-checkout-title">
-        <h2 id="business-checkout-title">Entrega y formas de pago</h2>
-        <label className="check"><input name="delivery_enabled" type="checkbox" defaultChecked={business.checkout.delivery_enabled}/> Ofrecer delivery</label>
-        <div className="form-grid">
-          <label>Costo de delivery (USD)<input name="delivery_fee" type="number" min="0" max="9999.99" step=".01" defaultValue={business.checkout.delivery_fee}/></label>
-          <label>Bolívares por USD (opcional)<input name="ves_rate" type="number" min=".0001" max="100000000" step=".0001" defaultValue={business.checkout.ves_rate ?? ''}/></label>
-          <label>Latitud del local (opcional)<input name="delivery_latitude" type="number" min="-90" max="90" step="any" defaultValue={business.checkout.latitude ?? ''}/></label>
-          <label>Longitud del local (opcional)<input name="delivery_longitude" type="number" min="-180" max="180" step="any" defaultValue={business.checkout.longitude ?? ''}/></label>
-        </div>
-        <label className="check"><input name="schedule_enabled" type="checkbox" defaultChecked={business.checkout.schedule_enabled}/> Aceptar pedidos programados</label>
+      <section className="business-setting-group" aria-labelledby="business-delivery-title">
+        <h2 id="business-delivery-title">Delivery</h2>
+        {business.checkout ? <>
+          <label className="check"><input name="delivery_enabled" type="checkbox" defaultChecked={business.checkout.delivery_enabled}/> Ofrecer delivery</label>
+          <div className="form-grid">
+            <label>Costo de delivery (USD)<input name="delivery_fee" type="number" min="0" max="9999.99" step=".01" inputMode="decimal"
+              defaultValue={business.checkout.delivery_fee || ''} aria-invalid={validation?.field==='delivery_fee'} aria-describedby="delivery-fee-help"/></label>
+          </div>
+          <p className="muted" id="delivery-fee-help">La tarifa se cobra una vez por pedido con delivery.</p>
+          <div className="form-grid">
+            <label>Latitud del local (opcional)<input name="delivery_latitude" type="number" min="-90" max="90" step="any" defaultValue={business.checkout.latitude ?? ''} aria-invalid={validation?.field==='delivery_latitude'}/></label>
+            <label>Longitud del local (opcional)<input name="delivery_longitude" type="number" min="-180" max="180" step="any" defaultValue={business.checkout.longitude ?? ''} aria-invalid={validation?.field==='delivery_longitude'}/></label>
+          </div>
+          {validation && <p className="notice" role="alert">{validation.message}</p>}
+        </> : !catalog.loading && !catalog.error && <p className="notice">Para configurar delivery, aplica la migración <code>202611280001_web_checkout.sql</code> en Supabase.</p>}
+      </section>
+      {business.checkout && <section className="business-setting-group" aria-labelledby="business-payments-title">
+        <h2 id="business-payments-title">Formas de pago</h2>
+        <label>Bolívares por USD (opcional)<input name="ves_rate" type="number" min=".0001" max="100000000" step=".0001" defaultValue={business.checkout.ves_rate ?? ''}/></label>
         <label className="check"><input name="terminal_enabled" type="checkbox" defaultChecked={business.checkout.terminal_enabled}/> Ofrecer punto de venta en el local</label>
         <p className="muted">Los datos de pago se muestran al cliente. Completa solo los métodos que aceptas.</p>
         <label>Instrucciones de pago móvil o transferencia<textarea name="transfer_instructions" maxLength={500} defaultValue={business.checkout.transfer_instructions ?? ''}/></label>
@@ -136,7 +159,7 @@ function Settings({catalog}:{catalog:Catalog}) {
       </section>}
       <button>{busy ? 'Guardando…' : 'Guardar configuración'}</button>
     </fieldset>
-    {(validation || message) && <p className="notice" role={validation ? 'alert' : 'status'}>{validation || message}</p>}
+    {message && <p className="notice" role="status">{message}</p>}
   </form>;
 }
 

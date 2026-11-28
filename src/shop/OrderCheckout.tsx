@@ -1,6 +1,6 @@
 import {lazy,Suspense,useMemo,useState,type FormEvent,type ReactNode} from 'react';
 import {labels,money,type Business} from '../model';
-import {bolivares,localDateTime,type Coordinates,type CustomerOrder,type Fulfillment,type PaymentMethod} from './checkoutModel';
+import {bolivares,localDateTime,validDeliveryFee,type Coordinates,type CustomerOrder,type Fulfillment,type PaymentMethod} from './checkoutModel';
 
 const DeliveryMap = lazy(()=>import('./DeliveryMap'));
 
@@ -9,7 +9,7 @@ export default function OrderCheckout({business,subtotal,count,basket,busy,block
   error:string; onPlace:(order:CustomerOrder)=>void;
 }) {
   const settings = business.checkout;
-  const [fulfillment,setFulfillment] = useState<Fulfillment>('pickup');
+  const [mode,setMode] = useState<Fulfillment>('pickup');
   const [schedule,setSchedule] = useState(false);
   const [payment,setPayment] = useState<PaymentMethod>('cash');
   const [currency,setCurrency] = useState<'USD'|'VES'>('USD');
@@ -19,10 +19,12 @@ export default function OrderCheckout({business,subtotal,count,basket,busy,block
   const latitude = settings?.latitude;
   const longitude = settings?.longitude;
   const mapOrigin = useMemo(()=>typeof latitude==='number' && typeof longitude==='number' ? {latitude,longitude} : null,[latitude,longitude]);
-  const mode = fulfillment==='delivery' && !settings?.delivery_enabled ? 'pickup' : fulfillment;
+  const configuredFee = Number(settings?.delivery_fee);
+  const deliveryRate = settings?.delivery_enabled && validDeliveryFee(configuredFee) ? configuredFee : null;
   const delivery = mode==='delivery';
+  const deliveryUnavailable = delivery && deliveryRate===null;
   const canSchedule = Boolean(settings?.schedule_enabled && mode!=='table');
-  const fee = delivery ? Number(settings?.delivery_fee ?? 0) : 0;
+  const fee = delivery ? deliveryRate ?? 0 : 0;
   const total = Math.round((subtotal+fee)*100)/100;
   const rate = settings?.ves_rate ? Number(settings.ves_rate) : null;
   const cashCurrency = rate && currency==='VES' ? 'VES' : 'USD';
@@ -37,6 +39,7 @@ export default function OrderCheckout({business,subtotal,count,basket,busy,block
 
   function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy || blocked || deliveryUnavailable) return;
     setValidation('');
     const fields = new FormData(event.currentTarget);
     const text = (name:string) => String(fields.get(name) ?? '').trim();
@@ -63,11 +66,11 @@ export default function OrderCheckout({business,subtotal,count,basket,busy,block
 
   return <form className="checkout-flow" onSubmit={submit}>
     <aside className="checkout-summary">
-      <div className="row"><h2>Tu pedido <span>{count}</span></h2>{!busy && <a href="/#menu">Añadir más</a>}</div>
+      <div className="row"><h2>Tu pedido <span className="order-item-count">{count}</span></h2>{!busy && <a href="/#menu">Añadir más</a>}</div>
       {basket}
       <dl className="order-prices">
         <div><dt>Subtotal</dt><dd>{money(subtotal)}</dd></div>
-        {delivery && <div><dt>Delivery</dt><dd>{fee ? money(fee) : 'Gratis'}</dd></div>}
+        {delivery && deliveryRate!==null && <div><dt>Costo de delivery</dt><dd>{money(fee)}</dd></div>}
         <div className="order-price-total"><dt>Total</dt><dd>{money(total)}</dd></div>
         {rate && <div><dt>Equivalente en bolívares</dt><dd>{bolivares(total*rate)}</dd></div>}
       </dl>
@@ -83,14 +86,15 @@ export default function OrderCheckout({business,subtotal,count,basket,busy,block
       <section className="checkout-card">
         <h2><span aria-hidden="true">2</span>Entrega</h2>
         <div className="checkout-options" role="group" aria-label="Modalidad de entrega">
-          <label className="checkout-option"><input type="radio" name="mode" checked={mode==='pickup'} onChange={()=>setFulfillment('pickup')}/>
+          <label className="checkout-option"><input type="radio" name="mode" checked={mode==='pickup'} onChange={()=>setMode('pickup')}/>
             <span><strong>Retiro en el local</strong>{business.address && <small>{business.address}</small>}</span></label>
-          {settings?.delivery_enabled && <label className="checkout-option"><input type="radio" name="mode" checked={delivery} onChange={()=>setFulfillment('delivery')}/>
-            <span><strong>Delivery a domicilio</strong><small>{settings.delivery_fee ? money(settings.delivery_fee) : 'Gratis'}</small></span></label>}
-          <label className="checkout-option"><input type="radio" name="mode" checked={mode==='table'} onChange={()=>setFulfillment('table')}/>
+          <label className="checkout-option" data-unavailable={deliveryRate===null}>
+            <input type="radio" name="mode" checked={delivery} disabled={deliveryRate===null} onChange={()=>setMode('delivery')}/>
+            <span><strong>Delivery a domicilio</strong><small>{deliveryRate===null ? 'No disponible por ahora' : money(deliveryRate)}</small></span></label>
+          <label className="checkout-option"><input type="radio" name="mode" checked={mode==='table'} onChange={()=>setMode('table')}/>
             <span><strong>Consumo en mesa</strong><small>Si ya estás en el local</small></span></label>
         </div>
-        {delivery && <div className="checkout-detail">
+        {delivery && !deliveryUnavailable && <div className="checkout-detail">
           <label>Dirección<input name="address" autoComplete="street-address" required minLength={5} maxLength={240} placeholder="Calle, sector y número de casa"/></label>
           <label>Punto de referencia (opcional)<input name="landmark" maxLength={160} placeholder="Ej. portón negro frente a la plaza"/></label>
           <Suspense fallback={<p role="status">Cargando mapa…</p>}><DeliveryMap initial={mapOrigin} value={location} onChange={setLocation}/></Suspense>
@@ -136,8 +140,9 @@ export default function OrderCheckout({business,subtotal,count,basket,busy,block
       </section>
     </fieldset>
     <div className="checkout-submit">
+      {deliveryUnavailable && <p className="notice" role="alert">El delivery dejó de estar disponible. Elige retiro en el local o consumo en mesa.</p>}
       {(validation || error) && <p className="notice" role="alert">{validation || error}</p>}
-      <button className="button portal-primary" disabled={busy || blocked}>
+      <button className="button portal-primary" disabled={busy || blocked || deliveryUnavailable}>
         <span>{busy ? 'Enviando pedido…' : 'Confirmar pedido'}</span><strong>{money(total)}</strong>
       </button>
     </div>

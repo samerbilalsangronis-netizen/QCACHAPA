@@ -40,6 +40,10 @@ export type SavedCheckoutDetails = Omit<CheckoutDetails,'expected_fee'|'expected
   ves_rate?:number;
 };
 
+export function validDeliveryFee(fee:number|null|undefined):fee is number {
+  return typeof fee==='number' && fee>=.01 && fee<=9999.99 && Math.round(fee*100)/100===fee;
+}
+
 export const bolivares = (amount:number) => new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)+' Bs';
 export function dateAndTime(iso:string,timezone:string) {
   return new Intl.DateTimeFormat('es-VE',{dateStyle:'medium',timeStyle:'short',timeZone:timezone}).format(new Date(iso));

@@ -1,4 +1,4 @@
-const CACHE = 'qcachapa-shell-14';
+const CACHE = 'qcachapa-shell-15';
 const featuredCovers = ['/portada/lomo.webp',...['cachapa','hamburguesa','perro','patacon'].flatMap(dish => [
   '/portada/'+dish+'.webp','/portada/'+dish+'-movil.webp',
 ])];

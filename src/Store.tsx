@@ -248,7 +248,7 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
         if (event.target === event.currentTarget) event.currentTarget.close();
       }}>
         <div className="portal-cart-inner">
-          <div className="row cart-heading"><h3 id="portal-cart-title">Tu pedido <span>{count}</span></h3>
+          <div className="row cart-heading"><h3 id="portal-cart-title">Tu pedido <span className="order-item-count">{count}</span></h3>
             <button type="button" className="cart-close secondary" aria-label="Cerrar pedido" onClick={()=>cartDialog.current?.close()}>×</button></div>
           {count ? <>{webBasket}<div className="public-basket-footer">
             <div className="row"><strong>Subtotal</strong><strong>{money(total)}</strong></div>

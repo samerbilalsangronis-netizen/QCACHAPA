@@ -192,7 +192,10 @@ html:has(.portal-cart[open]) { overflow: hidden; }
 .checkout-page .masthead { grid-template-columns: 1fr auto; }
 .checkout-page .masthead > a:last-child { display: flex; min-height: 44px; align-items: center; font-weight: 650; }
 .checkout-page main.shell { width: min(650px,calc(100% - 2rem)); padding-block: clamp(2rem,5vw,4rem); }
-.checkout-page h1 { font: 800 clamp(2.65rem,6vw,4.3rem)/1 'Barlow Condensed',sans-serif; margin-bottom: 1.1rem; }
+.checkout-page h1 {
+  font: 740 clamp(1.9rem,4.5vw,3.2rem)/1.16 'DM Sans Variable',sans-serif;
+  letter-spacing: .005em; word-spacing: .045em; margin-bottom: 1.1rem;
+}
 .checkout-basket { border: 0; border-radius: 18px; }
 .checkout-basket .cart-heading { margin-bottom: .85rem; }
 
