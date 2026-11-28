@@ -37,9 +37,10 @@ export function matchingProduct(dish:FeaturedDish,products:readonly Product[]) {
   }
 }
 
-export function referencePhoto(dish:FeaturedDish, product?:Product) {
+export function referencePhoto(dish:FeaturedDish, product?:Product, wide=false) {
   const uploaded = product?.image_url;
-  return uploaded && !legacyPhotos.has(uploaded) ? uploaded : '/plato-'+dish.image+'.webp';
+  if (uploaded && !legacyPhotos.has(uploaded)) return uploaded;
+  return (wide ? '/portada/' : '/plato-')+dish.image+'.webp';
 }
 
 export function menuPhoto(product:Product) {

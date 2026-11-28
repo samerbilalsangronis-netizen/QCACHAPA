@@ -1,4 +1,5 @@
-const CACHE = 'qcachapa-shell-11';
+const CACHE = 'qcachapa-shell-12';
+const lunchCovers = ['lomo','pollo','pabellon','pescado'].map(dish => '/portada/'+dish+'.webp');
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -6,7 +7,7 @@ self.addEventListener('install', event => {
     const html = await response.clone().text();
     const assets = Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g), match => match[1]);
     await cache.put('/', response);
-    await cache.addAll([...assets,'/logo-qcachapas.webp',...['lomo','pollo','pabellon','pescado','queso','chicharron','mechada'].map(dish => '/plato-'+dish+'.webp'),...['pabellon','pollo','asado','pescado'].map(dish => '/almuerzo-'+dish+'.webp'),'/cachapa.webp','/cachapa-portada.webp','/cachapa-portada-movil.webp','/manifest.webmanifest','/icon-192.png','/icon-512.png']);
+    await cache.addAll([...assets,...lunchCovers,'/logo-qcachapas.webp',...['lomo','pollo','pabellon','pescado','queso','chicharron','mechada'].map(dish => '/plato-'+dish+'.webp'),...['pabellon','pollo','asado','pescado'].map(dish => '/almuerzo-'+dish+'.webp'),'/cachapa.webp','/cachapa-portada.webp','/cachapa-portada-movil.webp','/manifest.webmanifest','/icon-192.png','/icon-512.png']);
   })());
 });
 self.addEventListener('activate', event => {
@@ -20,7 +21,7 @@ self.addEventListener('fetch', event => {
   const {request} = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-  const localAsset = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/menu/');
+  const localAsset = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/menu/') || lunchCovers.includes(url.pathname);
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(async () => (await caches.match('/')) ?? Response.error()));
   } else if (localAsset || /\/(logo-qcachapas\.webp|(?:almuerzo|plato)-[a-z]+\.webp|cachapa(?:-portada(?:-movil)?)?\.webp|manifest.webmanifest|icon-\d+.png)$/.test(url.pathname)) {

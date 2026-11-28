@@ -17,10 +17,12 @@ export default function FeaturedDishes({group,category,products,ordering,onOrder
   const dishes = lunch ? lunchDishes : cachapaDishes;
   const section = useRef<HTMLElement>(null);
   const [visible,setVisible] = useState(false);
+  const [pageVisible,setPageVisible] = useState(() => !document.hidden);
   const [playing,setPlaying] = useState(() => lunch && !matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [active,setActive] = useState(0);
-  const current = dishes[active];
-  const product = matchingProduct(current,products);
+  const slides = dishes.map(dish => ({dish,product:matchingProduct(dish,products)}));
+  const {dish:current,product} = slides[active];
+  const advancing = playing && visible && pageVisible;
   const Heading = lunch ? 'h1' : 'h2';
 
   useEffect(() => {
@@ -33,18 +35,21 @@ export default function FeaturedDishes({group,category,products,ordering,onOrder
 
   useEffect(() => {
     const preference = matchMedia('(prefers-reduced-motion: reduce)');
-    const change = () => {if (preference.matches) setPlaying(false);};
-    preference.addEventListener('change',change);
-    return () => preference.removeEventListener('change',change);
+    const reduceMotion = () => {if (preference.matches) setPlaying(false);};
+    const updateVisibility = () => setPageVisible(!document.hidden);
+    preference.addEventListener('change',reduceMotion);
+    document.addEventListener('visibilitychange',updateVisibility);
+    return () => {
+      preference.removeEventListener('change',reduceMotion);
+      document.removeEventListener('visibilitychange',updateVisibility);
+    };
   },[]);
 
   useEffect(() => {
-    if (!playing || !visible) return;
-    const timer = window.setInterval(() => {
-      if (!document.hidden) setActive(index => (index+1)%dishes.length);
-    },6000);
-    return () => window.clearInterval(timer);
-  },[playing,visible,dishes.length]);
+    if (!advancing) return;
+    const timer = window.setTimeout(() => setActive((active+1)%dishes.length),7000);
+    return () => window.clearTimeout(timer);
+  },[advancing,active,dishes.length]);
 
   function select(index:number) {
     setPlaying(false);
@@ -59,7 +64,15 @@ export default function FeaturedDishes({group,category,products,ordering,onOrder
         select(active + (event.key === 'ArrowRight' ? 1 : -1));
       }
     }}>
-    {background && <img src={background} className="food-feature-background" alt=""/>}
+    <div className="food-feature-image">
+      {background && <img src={background} className="food-feature-background" alt=""/>}
+      {slides.map(({dish,product:entry},index) => <picture key={dish.image} className={active === index ? 'is-active' : ''}
+        aria-hidden={active !== index}>
+        {lunch && <source media="(min-width: 761px) and (min-aspect-ratio: 5/4)" srcSet={referencePhoto(dish,entry,true)}/>}
+        <img src={referencePhoto(dish,entry)} alt={active === index ? dish.name : ''} width={627} height={627}
+          loading={lunch && index === 0 ? 'eager' : 'lazy'} fetchPriority={lunch && index === 0 ? 'high' : 'auto'}/>
+      </picture>)}
+    </div>
     <div className="shell food-feature-layout">
       <div className="food-feature-copy">
         <p className="food-feature-category">{lunch ? 'Almuerzos venezolanos' : 'Pide tu cachapa todo el día'}</p>
@@ -76,27 +89,23 @@ export default function FeaturedDishes({group,category,products,ordering,onOrder
               {lunch ? 'Ver menú de almuerzos' : 'Ver menú de cachapas'} <span aria-hidden="true">↓</span>
             </a>}
         </div>
-        <div className="food-feature-controls" aria-label={'Recorrer '+category.toLocaleLowerCase('es')}>
-          <button type="button" aria-label="Plato anterior" onClick={() => select(active-1)}>←</button>
+        <div className="food-feature-controls" role="group" aria-label={'Recorrer '+category.toLocaleLowerCase('es')}>
           <div className="food-feature-dots">
             {dishes.map((dish,index) => <button type="button" aria-label={dish.name} aria-pressed={active === index}
-              key={dish.image} onClick={() => select(index)}><span aria-hidden="true"/></button>)}
+              key={dish.image} onClick={() => select(index)}>
+              <span className={advancing && active === index ? 'is-advancing' : ''} aria-hidden="true"/>
+            </button>)}
           </div>
-          <button type="button" aria-label="Siguiente plato" onClick={() => select(active+1)}>→</button>
-          {lunch && <button type="button" aria-label={playing ? 'Pausar transición' : 'Reproducir transición'} onClick={() => setPlaying(!playing)}>
-            <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true">
-              {playing ? <path d="M6 4h2v12H6zm6 0h2v12h-2z"/> : <path d="m6 4 10 6-10 6z"/>}
-            </svg>
-          </button>}
+          <div className="food-feature-transport">
+            <button type="button" aria-label="Plato anterior" onClick={() => select(active-1)}>←</button>
+            <button type="button" aria-label="Siguiente plato" onClick={() => select(active+1)}>→</button>
+            {lunch && <button type="button" aria-label={playing ? 'Pausar transición' : 'Reproducir transición'} onClick={() => setPlaying(!playing)}>
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true">
+                {playing ? <path d="M6 4h2v12H6zm6 0h2v12h-2z"/> : <path d="m6 4 10 6-10 6z"/>}
+              </svg>
+            </button>}
+          </div>
         </div>
-      </div>
-      <div className="food-feature-image">
-        {dishes.map((dish,index) => {
-          return <img key={dish.image} className={active === index ? 'is-active' : ''}
-            src={referencePhoto(dish,matchingProduct(dish,products))}
-            alt={active === index ? dish.name : ''} aria-hidden={active !== index} width={740} height={740}
-            loading={lunch && index === 0 ? 'eager' : 'lazy'} fetchPriority={lunch && index === 0 ? 'high' : 'auto'}/>;
-        })}
       </div>
     </div>
   </section>;

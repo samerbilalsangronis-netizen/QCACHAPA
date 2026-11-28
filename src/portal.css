@@ -1,4 +1,5 @@
 .portal {
+  --storefront-header-height: 92px;
   --portal-night: #21251a;
   --portal-corn: #ffc650;
   --portal-husk: #fff6dc;
@@ -195,9 +196,21 @@ html:has(.portal-cart[open]) { overflow: hidden; }
 .checkout-basket { border: 0; border-radius: 18px; }
 .checkout-basket .cart-heading { margin-bottom: .85rem; }
 
-.portal .storefront-header .masthead { min-height: 100px; }
-.portal .storefront-header .brand img { height: 92px; max-width: min(170px,37vw); }
-@media (max-width: 760px) {
-  .portal .storefront-header .masthead { min-height: 82px; }
-  .portal .storefront-header .brand img { height: 74px; }
+.portal .storefront-header { background: #fff8e8; color: #422b1e; }
+.portal .storefront-header .masthead { min-height: var(--storefront-header-height); }
+.portal .storefront-header .brand img { height: 84px; max-width: min(165px,34vw); }
+.portal .storefront-header nav button { color: inherit; background: transparent; padding-inline: .75rem; }
+.portal .storefront-header nav a { padding-inline: .6rem; }
+.portal .storefront-header nav .storefront-reserve { background: var(--portal-corn); color: #422b1e; border-radius: 100px; }
+.portal .storefront-header .portal-cart-link { color: #422b1e; border-color: #d8bda0; border-radius: 100px; }
+.portal .storefront-header .portal-cart-link:hover { background: #f7e8d0; }
+.portal .storefront-header :is(a,button):focus-visible { outline-color: #925225; }
+@media (max-width: 620px) {
+  .portal { --storefront-header-height: 112px; }
+  .portal .storefront-header .masthead { grid-template-columns: 1fr auto; gap: 0 .6rem; padding-block: .2rem; }
+  .portal .storefront-header .brand img { height: 63px; }
+  .portal .storefront-header nav {
+    grid-column: 1 / -1; grid-row: 2; justify-content: space-between; gap: .15rem;
+  }
+  .portal .storefront-header .portal-cart-link { grid-column: 2; grid-row: 1; }
 }
