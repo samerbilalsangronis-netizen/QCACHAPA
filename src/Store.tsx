@@ -2,8 +2,12 @@ import {useEffect,useImperativeHandle,useRef,useState,type FormEvent,type RefObj
 import ProductChoice,{type Choice} from './shop/ProductChoice';
 import {menuPhoto} from './shop/featuredMenu';
 import {publicMenuGroups} from './shop/catalogGroups';
+import BasketLines from './shop/BasketLines';
+import OrderCheckout from './shop/OrderCheckout';
+import type {CheckoutDetails} from './shop/checkoutModel';
 import {configuredPrice,optionLabel,selectedOptions} from './productOptions';
 import './shop/store-dialogs.css';
+import './shop/order-flow.css';
 import {type Catalog} from './data';
 import {money,readStored,rpc,saveStored,type Product} from './model';
 
@@ -48,7 +52,9 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
     return <article className="product" data-menu-reveal={source === 'web' ? '' : undefined} key={product.id}>
       {photo && <img src={photo} alt="" width={800} height={500} loading="lazy"/>}
       <div>{grouped ? <h4>{product.name}</h4> : <h3>{product.name}</h3>}{product.description && <p>{product.description}</p>}
-        <div className="row"><strong>{money(product.price)}</strong><button disabled={busy || (source === 'web' && !business.accepting_orders)} onClick={() => product.options?.length ? setCustomizing({product}) : add(product)}>{product.options?.length ? 'Personalizar' : 'Agregar'}</button></div>
+        <div className="row"><strong>{money(product.price)}</strong><button className={source==='web' ? 'public-product-button' : undefined}
+          aria-label={source==='web' ? 'Elegir '+product.name : undefined} disabled={busy || (source === 'web' && !business.accepting_orders)}
+          onClick={() => source==='web' || product.options?.length ? setCustomizing({product}) : add(product)}>{product.options?.length ? 'Personalizar' : 'Agregar'}</button></div>
       </div>
     </article>;
   };
@@ -65,27 +71,24 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
     else update(draft.lines.map((line,i) => i === index ? {...line,quantity:line.quantity+1} : line));
   }
 
-  async function place(event:FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function place(order:{mode:string;customer:FormDataEntryValue|null;phone:FormDataEntryValue|null;
+    table:FormDataEntryValue|null;notes:FormDataEntryValue|null;details?:CheckoutDetails}, onSuccess?:()=>void) {
     if (sending.current || !count || hasUnavailable || (source === 'web' && (!canConfirm || !business.accepting_orders || !checkout))) return;
     sending.current = true;
     setBusy(true);
     setError('');
-    const form = event.currentTarget;
-    const fields = new FormData(form);
     try {
-      const result = await rpc('place_order',{
-        p_key:draft.key,p_source:source,p_mode:tableSession ? 'table' : mode,p_customer:fields.get('customer'),
-        p_phone:fields.get('phone'),p_notes:fields.get('notes'),p_table:tableSession ?? fields.get('table'),
+      const args = {
+        p_key:draft.key,p_mode:order.mode,p_customer:order.customer,
+        p_phone:order.phone,p_notes:order.notes,p_table:order.table,
         p_lines:draft.lines.map(line => ({...line,expected_price:priceFor(line)})),
-      });
+      };
+      const result = source==='web' && business.checkout && order.details
+        ? await rpc('place_web_order',{...args,p_details:order.details})
+        : await rpc('place_order',{...args,p_source:source});
       update([]);
       if (source === 'web') window.location.assign('/pedido/#' + result.tracking_key);
-      else {
-        form.reset();
-        setMode('pickup');
-        onPlaced?.();
-      }
+      else onSuccess?.();
     } catch (cause) {
       setError((cause as Error).message);
       void catalog.refresh();
@@ -95,8 +98,20 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
     }
   }
 
+  function placeInPerson(event:FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const fields = new FormData(form);
+    void place({mode:tableSession ? 'table' : mode,customer:fields.get('customer'),phone:fields.get('phone'),
+      table:tableSession ?? fields.get('table'),notes:fields.get('notes')},()=>{
+      form.reset();
+      setMode('pickup');
+      onPlaced?.();
+    });
+  }
+
   function showCart() {
-    if (cartDialog?.current) cartDialog.current.showModal();
+    if (cartDialog?.current) {if (!cartDialog.current.open) cartDialog.current.showModal();}
     else cart.current?.scrollIntoView();
   }
 
@@ -107,8 +122,7 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
     },
     orderFeatured(product) {
       if (!product.available || !business.accepting_orders || !canConfirm || busy) return;
-      if (product.options?.length) setCustomizing({product,fromFeature:true});
-      else {add(product);showCart();}
+      setCustomizing({product,fromFeature:true});
     },
   }));
 
@@ -133,20 +147,21 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
     }
   }
 
-  const BasketHeading = checkout ? 'h2' : 'h3';
+  const webBasket = source==='web' && <BasketLines items={draft.lines.map(line=>({product:byId.get(line.product_id),
+    quantity:line.quantity,unitPrice:priceFor(line),notes:line.notes,options:optionsFor(line),optionsChanged:optionsChanged(line)
+  }))} checked={canConfirm} disabled={busy}
+    onEdit={index=>{const product=byId.get(draft.lines[index].product_id); if (product?.available) setCustomizing({product,index});}}
+    onRemove={index=>update(draft.lines.filter((_,i)=>i!==index))}
+    onQuantity={(index,quantity)=>update(draft.lines.map((line,i)=>i===index ? {...line,quantity} : line))}/>;
+
   const basket = <>
     <div className="row cart-heading">
-      <BasketHeading id={cartDialog ? 'portal-cart-title' : undefined}>Tu pedido <span>{count}</span></BasketHeading>
-      {cartDialog && <button type="button" className="cart-close secondary" aria-label="Cerrar pedido" onClick={() => cartDialog.current?.close()}>×</button>}
+      <h3>Tu pedido <span>{count}</span></h3>
     </div>
     {!count ? <div className="cart-empty">
-      <p className="muted">{checkout ? 'Agrega productos al menú para hacer un pedido.' : 'Aquí aparecerán los productos que elijas.'}</p>
-      {cartDialog && <button type="button" className="secondary" onClick={() => {
-        cartDialog.current?.close();
-        document.getElementById('menu')?.focus();
-      }}>Volver al menú</button>}
+      <p className="muted">Aquí aparecerán los productos que elijas.</p>
     </div> :
-      <form onSubmit={place}>
+      <form onSubmit={placeInPerson}>
         <fieldset disabled={busy}>
           {draft.lines.map((line,index) => {
             const product = byId.get(line.product_id);
@@ -168,11 +183,6 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
             </div>;
           })}
           <div className="row total"><span>Total estimado</span><strong>{money(total)}</strong></div>
-          {source === 'web' && !checkout ? (
-            hasUnavailable || !canConfirm || !business.accepting_orders
-              ? <p className="notice">Revisa la disponibilidad para continuar.</p>
-              : <a className="button" href="/checkout/">Continuar al pedido</a>
-          ) : <>
             {!tableSession && <>
             <label>Modalidad<select value={mode} onChange={e => setMode(e.target.value)}><option value="pickup">Retiro en local</option><option value="table">Consumo en mesa</option></select></label>
             {mode === 'table' && <label>Mesa<input name="table" required maxLength={40}/></label>}
@@ -181,13 +191,12 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
             </>}
             <label>Observaciones del pedido<textarea name="notes" maxLength={500}/></label>
             {error && <p className="notice" role="alert">{error}</p>}
-            <button disabled={hasUnavailable || (source === 'web' && (!canConfirm || !business.accepting_orders))}>{busy ? 'Registrando…' : tableSession ? 'Enviar comanda a cocina' : 'Confirmar pedido'}</button>
-          </>}
+            <button disabled={hasUnavailable}>{busy ? 'Registrando…' : tableSession ? 'Enviar comanda a cocina' : 'Confirmar pedido'}</button>
         </fieldset>
       </form>}
   </>;
 
-  const customization = customizing && <ProductChoice product={customizing.product}
+  const customization = customizing && <ProductChoice product={customizing.product} publicChoice={source==='web'}
     initial={customizing.index === undefined ? undefined : {...draft.lines[customizing.index],option_ids:draft.lines[customizing.index].option_ids ?? []}}
     onClose={() => setCustomizing(null)} onSave={(choice:Choice) => {
       const line = {product_id:customizing.product.id,...choice};
@@ -196,11 +205,12 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
       if (customizing.fromFeature) requestAnimationFrame(showCart);
     }}/>;
 
-  if (checkout) return <section className="panel checkout-basket" aria-label="Detalles del pedido">
+  if (checkout) return <section className="checkout-basket" aria-label="Detalles del pedido">
     {catalog.loading && <p role="status">Comprobando el menú…</p>}
     {catalog.error && <p role="alert" className="notice">No se pudo comprobar la disponibilidad. Intenta recargar.</p>}
     {canConfirm && !business.accepting_orders && <p className="notice">Los pedidos en línea están cerrados.</p>}
-    {basket}
+    <OrderCheckout business={business} subtotal={total} count={count} basket={webBasket} busy={busy}
+      blocked={hasUnavailable || !canConfirm || !business.accepting_orders} error={error} onPlace={order=>void place(order)}/>
     {customization}
   </section>;
 
@@ -234,12 +244,26 @@ export function Store({catalog,source:channel='web',onPlaced,cartDialog,checkout
           </div> : <div className="empty">{search || (source !== 'web' && category) ? 'No encontramos productos con estos filtros.' : 'El menú todavía no está disponible.'}</div>}
         </div>
       </div>
-      {cartDialog ? <dialog className="portal-cart" ref={cartDialog} aria-labelledby="portal-cart-title" onClick={event => {
+      {cartDialog ? <dialog className="portal-cart public-basket" ref={cartDialog} aria-labelledby="portal-cart-title" onClick={event => {
         if (event.target === event.currentTarget) event.currentTarget.close();
       }}>
-        <div className="portal-cart-inner">{basket}</div>
+        <div className="portal-cart-inner">
+          <div className="row cart-heading"><h3 id="portal-cart-title">Tu pedido <span>{count}</span></h3>
+            <button type="button" className="cart-close secondary" aria-label="Cerrar pedido" onClick={()=>cartDialog.current?.close()}>×</button></div>
+          {count ? <>{webBasket}<div className="public-basket-footer">
+            <div className="row"><strong>Subtotal</strong><strong>{money(total)}</strong></div>
+            {hasUnavailable || !canConfirm || !business.accepting_orders
+              ? <p className="notice">Revisa la disponibilidad para continuar.</p>
+              : <a className="button portal-primary" href="/checkout/">Continuar</a>}
+          </div></> : <div className="cart-empty"><p className="muted">Aquí aparecerán los productos que elijas.</p>
+            <button type="button" className="secondary" onClick={()=>{cartDialog.current?.close();menu.current?.focus();}}>Volver al menú</button>
+          </div>}
+        </div>
       </dialog> : <aside className="cart panel" ref={cart}>{basket}</aside>}
     </div>
+    {cartDialog && count>0 && <button className="floating-basket" type="button" aria-haspopup="dialog" onClick={showCart}>
+      <span className="floating-basket-count">{count}</span><span>Ver pedido</span><strong>{money(total)}</strong>
+    </button>}
     {customization}
   </section>;
 }

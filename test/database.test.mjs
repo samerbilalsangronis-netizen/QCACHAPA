@@ -36,7 +36,7 @@ before(async () => {
     alter table storage.objects enable row level security;
     create publication supabase_realtime;
   `);
-  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql','202611250004_menu_starters.sql','202611250005_product_options.sql','202611260001_table_service.sql']) {
+  for (const file of ['202611250001_core.sql','202611250002_reports.sql','202611250003_catalog_images.sql','202611250004_menu_starters.sql','202611250005_product_options.sql','202611260001_table_service.sql','202611280001_web_checkout.sql']) {
     await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   }
   for (const [id,role] of [[admin,'admin'],[cashier,'cashier'],[kitchen,'kitchen'],[secondAdmin,'admin']]) {
@@ -349,4 +349,71 @@ test('la segunda hoja incorpora solo bebidas y conserva los precios que ya está
   await acting(null);
   assert.equal(await value("select name value from products where name='Agua'"),'Agua');
   assert.equal(await value("select name value from products where name='Merengadas'"),undefined);
+});
+
+test('checkout valida delivery, hora y efectivo, despacha y protege datos personales', async () => {
+  await db.exec("reset role; update orders set created_at=now()-interval '2 minutes' where source='web' and created_at>now()-interval '1 minute'");
+  const key = crypto.randomUUID();
+  const when = await value(`select to_char((now()+interval '1 hour') at time zone 'America/Caracas','YYYY-MM-DD"T"HH24:MI') value`);
+  const lines = JSON.stringify([{product_id:product,quantity:2,expected_price:5.55,notes:'Sin mantequilla'}]);
+  const choices = {address:'Calle 5, casa 12',landmark:'Portón negro',latitude:8.33,longitude:-71.75,
+    expected_fee:2.5,schedule_local:when,payment:'cash',cash_currency:'VES',expected_rate:50,cash_amount:700};
+  const submit = (details=choices, phone='0412 123 4567') => value(
+    "select place_web_order($1,'delivery','Cliente web',$2,null,'Sin cubiertos',$3,$4) value",
+    [key,phone,lines,JSON.stringify(details)]);
+  await acting(admin);
+  await db.exec(`update business set accepting_orders=true, checkout='{"delivery_enabled":false,"schedule_enabled":true,"delivery_fee":2.5,"ves_rate":50}'`);
+  await acting(null);
+  await assert.rejects(submit(),/delivery ya no está disponible/);
+  await acting(admin);
+  await db.exec("update business set checkout=jsonb_set(checkout,'{delivery_enabled}','true')");
+  await acting(null);
+  await assert.rejects(submit(choices,'123'),/WhatsApp válido/);
+  await assert.rejects(submit({...choices,expected_fee:0}),/costo de entrega/);
+  await assert.rejects(submit({...choices,expected_rate:49}),/tasa en bolívares/);
+  await assert.rejects(submit({...choices,cash_amount:600}),/cubrir el total/);
+  await assert.rejects(submit({...choices,schedule_local:'2001-01-01T12:00'}),/Programa el pedido/);
+  await assert.rejects(submit({...choices,longitude:null}),/Ubicación inválida/);
+  await assert.rejects(submit({...choices,payment:'binance'}),/método de pago disponible/);
+  const order = await submit();
+  assert.equal(order.total,13.6);
+  assert.deepEqual(await submit(),order);
+  const loadTracking = () => value('select track_order($1) value',[order.tracking_key]);
+  const receipt = await loadTracking();
+  assert.equal(receipt.mode,'delivery');
+  assert.equal(receipt.delivery_fee,2.5);
+  assert.equal(receipt.payment,'cash');
+  assert.equal(receipt.paid,false);
+  assert.equal(receipt.items[0].notes,'Sin mantequilla');
+  assert.equal('address' in receipt || 'phone' in receipt || 'latitude' in receipt,false);
+  await acting(cashier);
+  const id = await value('select id value from orders where request_key=$1',[key]);
+  assert.equal(await value("select checkout_details->>'address' value from orders where id=$1",[id]),choices.address);
+  await assert.rejects(db.query('select dispatch_web_order($1)',[id]),/no está listo/);
+  await db.query("select move_order($1,'confirmed')",[id]);
+  await acting(kitchen);
+  assert.equal(await value('select scheduled_at::text value from kitchen_tickets where id=$1',[id]) !== null,true);
+  await db.query("select move_order($1,'preparing')",[id]);
+  await db.query("select move_order($1,'ready')",[id]);
+  await assert.rejects(db.query('select dispatch_web_order($1)',[id]),/Sin permiso/);
+  await acting(cashier);
+  await db.query('select dispatch_web_order($1)',[id]);
+  assert.equal((await loadTracking()).status,'out_for_delivery');
+  await db.query("select move_order($1,'delivered')",[id]);
+  assert.equal((await loadTracking()).status,'delivered');
+  if (!await value('select id value from shifts where closed_at is null')) await db.query("select change_shift('open',0)");
+  await db.query("select record_payment($1,'cash')",[id]);
+  await acting(null);
+  assert.equal((await loadTracking()).paid,true);
+  await acting(admin);
+  await db.exec("update business set checkout=jsonb_set(checkout,'{transfer_instructions}',to_jsonb('Datos de pago originales'::text))");
+  await acting(null);
+  const transfer = await value("select place_web_order($1,'pickup','Cliente web','04121234567',null,null,$2,$3) value",
+    [crypto.randomUUID(),lines,JSON.stringify({expected_fee:0,expected_rate:50,payment:'transfer'})]);
+  await acting(admin);
+  await db.exec("update business set checkout=jsonb_set(checkout,'{transfer_instructions}',to_jsonb('Datos de pago nuevos'::text))");
+  await acting(null);
+  const trackedTransfer = await value('select track_order($1) value',[transfer.tracking_key]);
+  assert.equal(trackedTransfer.payment_instructions,'Datos de pago originales');
+  assert.equal(trackedTransfer.ves_rate,50);
 });

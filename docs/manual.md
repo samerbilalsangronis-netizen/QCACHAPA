@@ -28,4 +28,8 @@ La dueña crea las mesas reales en **Mesas**. Cada mozo entra con su propia cuen
 
 Caja y la dueña pueden supervisar todas las mesas. Cuando cocina marque la comanda lista, confirma la entrega. Con todas las comandas entregadas o anuladas, **Cobrar y cerrar cuenta** registra el saldo en el turno de caja y libera la mesa. Los cobros ya registrados se conservan en el historial y aparecen en **Reportes**. El rol de mozo puede enviar comandas y seguir sus mesas, mientras caja o administración cobran.
 
-Las fotos ilustrativas de la portada se sustituyen automáticamente por la foto de un producto activo que coincida con el nombre del plato destacado. Si el plato está disponible y los pedidos están abiertos, el botón de la portada lo agrega al pedido o abre sus opciones.
+Las fotos ilustrativas de la portada se sustituyen automáticamente por la foto de un producto activo que coincida con el nombre del plato destacado. Si el plato está disponible y los pedidos están abiertos, el botón **Ordenar** abre la personalización del producto.
+
+## Pedido en línea
+
+El cliente elige un plato, revisa sus opciones y lo agrega al pedido. Desde **Ver pedido** puede cambiar cantidades, editar o quitar productos. **Continuar** abre los datos de contacto, la entrega, la hora y el método de pago. Tras confirmar, el cliente recibe un número y un enlace que se actualiza cuando el personal cambia el estado. Si el negocio configuró WhatsApp, puede enviar una copia desde ese enlace. Caja registra el cobro después de verificarlo.

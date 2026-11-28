@@ -3,6 +3,7 @@ import {Store} from './Store';
 import {useOnline,type Catalog} from './data';
 import {db,labels,money,rpc,time,type Order,type Shift,type Ticket} from './model';
 import {staffRoutes,type CashierView} from './staffRoutes';
+import {bolivares,dateAndTime} from './shop/checkoutModel';
 
 const client = () => db!;
 
@@ -26,7 +27,8 @@ const orderFilters = [
   {id:'all',label:'Todos',matches:(_order:Order,_paid:boolean) => true},
   {id:'received',label:'Nuevos',matches:(order:Order) => order.status === 'received'},
   {id:'preparing',label:'En cocina',matches:(order:Order) => ['confirmed','preparing'].includes(order.status)},
-  {id:'ready',label:'Listos',matches:(order:Order) => order.status === 'ready'},
+  {id:'ready',label:'Listos',matches:(order:Order) => order.status==='ready' && !order.checkout_details?.dispatched_at},
+  {id:'out_for_delivery',label:'En camino',matches:(order:Order) => order.status==='ready' && Boolean(order.checkout_details?.dispatched_at)},
   {id:'pending',label:'Por cobrar',matches:(order:Order,paid:boolean) => !paid && order.status !== 'cancelled'},
   {id:'delivered',label:'Entregados',matches:(order:Order) => order.status === 'delivered'},
   {id:'cancelled',label:'Cancelados',matches:(order:Order) => order.status === 'cancelled'},
@@ -46,9 +48,11 @@ export function Cashier({catalog,user,admin,view,navigate}:{
   const [receipt,setReceipt] = useState<Order|null>(null);
   const [paper,setPaper] = useState('58');
   const online = useOnline();
+  const usesWebCheckout = Boolean(catalog.business.checkout);
   const refresh = useCallback(async () => {
+    const details = usesWebCheckout ? ',checkout_details' : '';
     const [sales,turns] = await Promise.all([
-      client().from('orders').select('id,number,status,source,mode,table_name,notes,created_at,prep_minutes,total,customer,order_lines(id,name,quantity,notes,price),payments(method,amount)')
+      client().from('orders').select('id,number,status,source,mode,table_name,notes,created_at,prep_minutes,total,customer,phone'+details+',order_lines(id,name,quantity,notes,price),payments(method,amount)')
         .order('created_at',{ascending:false}).limit(80).overrideTypes<Order[],{merge:false}>(),
       client().from('shifts').select('*').eq('cashier',user).order('opened_at',{ascending:false}).limit(20),
     ]);
@@ -61,7 +65,7 @@ export function Cashier({catalog,user,admin,view,navigate}:{
     }
     if (turns.data) setShifts(turns.data);
     setLoading(false);
-  },[user]);
+  },[user,usesWebCheckout]);
   useEffect(() => {
     void refresh();
     const channel = client().channel('cashier-kitchen')
@@ -127,14 +131,28 @@ export function Cashier({catalog,user,admin,view,navigate}:{
         </div>
       </div>
       <div className="products order-board">
-      {visible.map(order => <article key={order.id} className={'panel order '+(order.status === 'ready' ? 'ready' : '')}>
+      {visible.map(order => {
+        const detail = order.checkout_details;
+        const status = order.status==='ready' && detail?.dispatched_at ? 'out_for_delivery' : order.status;
+        return <article key={order.id} className={'panel order '+(order.status === 'ready' ? 'ready' : '')}>
         <div className="row"><h3>#{order.number} · {order.customer}</h3><strong>{money(order.total)}</strong></div>
-        <p>{labels[order.status]} · {labels[order.source]} · {labels[order.mode]} {order.table_name}</p>
+        <p>{labels[status]} · {labels[order.source]} · {labels[order.mode]} {order.table_name}</p>
+        {order.phone && <p>Teléfono · <a href={'tel:'+order.phone.replace(/[^+0-9]/g,'')}>{order.phone}</a></p>}
+        {detail?.scheduled_at && <p className="notice">Programado · {dateAndTime(detail.scheduled_at,catalog.business.timezone)}</p>}
+        {detail?.address && <p>Dirección · {detail.address}{detail.landmark && ' · '+detail.landmark}</p>}
+        {typeof detail?.latitude==='number' && typeof detail.longitude==='number' && <p>
+          <a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(detail.latitude+','+detail.longitude)}
+            target="_blank" rel="noopener noreferrer">Ver punto de entrega</a></p>}
+        {detail?.delivery_fee ? <p>Delivery · {money(detail.delivery_fee)}</p> : null}
+        {detail?.payment && <p>Pago elegido · {labels[detail.payment]}{detail.cash_amount!==undefined &&
+          ' · Entrega '+(detail.cash_currency==='VES' ? bolivares(detail.cash_amount) : money(detail.cash_amount))}</p>}
         {order.order_lines.map(line => <p key={line.id}>{line.quantity} × {line.name}{line.notes && ' · '+line.notes}</p>)}
         {order.notes && <p>{order.notes}</p>}
         <div className="inline">
           {order.status === 'received' && <button disabled={disabled} onClick={() => run('move_order',{p_id:order.id,p_status:'confirmed'})}>Enviar a cocina</button>}
-          {order.status === 'ready' && <button disabled={disabled} onClick={() => run('move_order',{p_id:order.id,p_status:'delivered'})}>Confirmar entrega</button>}
+          {status==='ready' && order.mode==='delivery' && <button disabled={disabled} onClick={()=>run('dispatch_web_order',{p_id:order.id})}>Marcar en camino</button>}
+          {(status==='out_for_delivery' || (status==='ready' && order.mode!=='delivery')) &&
+            <button disabled={disabled} onClick={() => run('move_order',{p_id:order.id,p_status:'delivered'})}>Confirmar entrega</button>}
           {admin && !paid.has(order.id) && !['delivered','cancelled'].includes(order.status) &&
             <details className="order-cancel">
               <summary>Cancelar pedido</summary>
@@ -154,16 +172,17 @@ export function Cashier({catalog,user,admin,view,navigate}:{
             const fields = new FormData(event.currentTarget);
             void run('record_payment',{p_id:order.id,p_method:fields.get('method')});
           }}>
-            <label>Método<select name="method"><option value="cash">Efectivo</option><option value="terminal">Punto de venta</option><option value="transfer">Transferencia verificada</option></select></label>
+            <label>Método<select name="method" defaultValue={detail?.payment==='binance' ? 'transfer' : detail?.payment ?? 'cash'}><option value="cash">Efectivo</option><option value="terminal">Punto de venta</option><option value="transfer">Transferencia verificada</option></select></label>
             <button disabled={disabled}>Registrar cobro</button>
           </form>}
-      </article>)}
+      </article>;})}
     </div>
     {loading ? <p role="status">Cargando pedidos…</p> : !visible.length && <p className="empty">No hay pedidos para mostrar.</p>}
     </section>}
     {receipt && <dialog open className={'panel receipt paper-'+paper}>
       <h2>{catalog.business.name}</h2><p>Comprobante de compra · #{receipt.number}</p>
       {receipt.order_lines.map(line => <p key={line.id}>{line.quantity} × {line.name} · {money(Number(line.price)*line.quantity)}</p>)}
+      {receipt.checkout_details?.delivery_fee ? <p>Delivery · {money(receipt.checkout_details.delivery_fee)}</p> : null}
       <strong>Total · {money(receipt.total)}</strong><p>Comprobante interno. Sin validez fiscal.</p>
       <div className="inline no-print">
         <label>Formato<select value={paper} onChange={event => setPaper(event.target.value)}>
@@ -252,6 +271,7 @@ export function Kitchen({timezone}:{timezone:string}) {
           return <article className={'panel ticket '+urgency} key={ticket.id}>
             <div className="row"><h3>#{ticket.number}</h3><strong>{elapsed} min</strong></div>
             <p>{time(ticket.created_at,timezone)} · {labels[ticket.source]} · {labels[ticket.mode]} {ticket.table_name}</p>
+            {ticket.scheduled_at && <p className="notice">Programado · {dateAndTime(ticket.scheduled_at,timezone)}</p>}
             <ul>{ticket.lines.map(line => <li key={line.id}><strong>{line.quantity} × {line.name}</strong>
               {line.notes && <div className="notice">{line.notes}</div>}
               {status === 'preparing' && <label className="check">
