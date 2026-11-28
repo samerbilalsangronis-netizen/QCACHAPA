@@ -2,39 +2,36 @@
   overflow: hidden;
   position: relative;
   isolation: isolate;
+  background: #3e2118; color: #fff8e9;
 }
-.food-feature-lunch { background: #3e2118; color: #fff8e9; }
-.food-feature-layout { position: relative; z-index: 2; }
-.food-feature-lunch .food-feature-layout {
+.food-feature-layout {
+  position: relative; z-index: 2;
   display: grid;
   align-items: end;
   min-height: max(33rem, calc(100svh - var(--storefront-header-height)));
   padding-block: 2rem clamp(2rem, calc((100svh - 38rem) * .6), 12rem);
 }
-.food-feature-copy { min-width: 0; }
-.food-feature-lunch .food-feature-copy { max-width: min(52%, 39rem); }
+.food-feature-copy { min-width: 0; max-width: min(52%, 39rem); }
 .food-feature-category {
   display: flex; align-items: center; gap: .7rem;
   color: #ffdb8e; font-size: .78rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
   margin-bottom: .9rem;
 }
 .food-feature-category::before { content: ''; width: 1.65rem; height: 2px; flex: none; background: currentColor; }
-.food-feature-copy :is(h1,h2) {
+.food-feature-copy h1 {
   font: 800 clamp(4.25rem, 9.6vw, 9rem)/.87 'Barlow Condensed', sans-serif;
   letter-spacing: -.018em; text-wrap: balance; overflow-wrap: anywhere;
 }
-.food-feature-caption { animation: feature-caption-in .68s cubic-bezier(.2,.75,.26,1) both; }
-.food-feature-caption p {
+.food-feature-caption { text-shadow: 0 2px 22px #2c100fb3; animation: feature-caption-in .68s cubic-bezier(.2,.75,.26,1) both; }
+.food-feature-caption h1 + p {
   margin-top: .95rem; color: #fff0d6; font-size: clamp(1rem, 1.55vw, 1.24rem);
   max-width: 34ch; text-wrap: pretty;
 }
-.food-feature-lunch .food-feature-caption { text-shadow: 0 2px 22px #2c100fb3; }
 .food-feature-order { margin-top: clamp(1.15rem, 3vw, 1.85rem); }
 .portal .food-feature-order .button { border-radius: 100px; padding-inline: 1.3rem; gap: .75rem; }
 .food-feature-order button span { font-size: .84rem; opacity: .9; }
 
-.food-feature-image { overflow: hidden; isolation: isolate; }
-.food-feature-lunch .food-feature-image { position: absolute; inset: 0; }
+.food-feature-image { position: absolute; inset: 0; overflow: hidden; isolation: isolate; }
 .food-feature-image picture {
   position: absolute; inset: 0; opacity: 0; visibility: hidden; transform: scale(1.035);
   transition: opacity 0s .72s, visibility 0s .72s, transform .85s ease;
@@ -48,9 +45,9 @@
   position: absolute; z-index: 2; inset: 0; opacity: .2;
   mask-image: linear-gradient(90deg, #000, transparent 60%);
 }
-.food-feature-lunch picture img { object-position: right center; }
-.food-feature-lunch picture.is-active img { animation: feature-photo-drift 8s ease-out both; transform-origin: 72% 50%; }
-.food-feature-lunch::after {
+.food-feature-image picture img { object-position: right center; }
+.food-feature-image picture.is-active img { animation: feature-photo-drift 8s ease-out both; transform-origin: 72% 50%; }
+.food-feature::after {
   content: ''; position: absolute; z-index: 1; inset: 0; pointer-events: none;
   background:
     linear-gradient(90deg, #29150dee 0%, #29150da6 31%, #29150d36 53%, transparent 72%),
@@ -76,58 +73,36 @@
 .food-feature-dots span::after { content: ''; position: absolute; inset: 0; background: #ffcf68; transform: scaleX(0); transform-origin: left; }
 .food-feature-dots button[aria-pressed=true] span::after { transform: scaleX(1); }
 .food-feature-dots button[aria-pressed=true] span.is-advancing::after { animation: feature-progress 7s linear both; }
-.portal .food-feature-lunch :is(button,a):focus-visible { outline-color: #ffcf68; }
-
-.food-feature-cachapa { color: #34241b; background: #f7df9f; }
-.food-feature-cachapa .food-feature-layout {
-  display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,.85fr); align-items: center;
-  gap: clamp(2rem, 5vw, 5rem); min-height: clamp(26rem, 44vw, 40rem);
-  padding-block: clamp(2.35rem, 6vw, 5rem);
-}
-.food-feature-cachapa .food-feature-copy { grid-column: 2; }
-.food-feature-cachapa .food-feature-image {
-  position: absolute; inset: 0 47% 0 0; background: #ad703c;
-}
-.food-feature-cachapa .food-feature-category { color: #744525; }
-.food-feature-cachapa .food-feature-caption h2 { font-size: clamp(3rem, 5.7vw, 5.75rem); }
-.food-feature-cachapa .food-feature-caption p { color: #563b27; }
-.portal .food-feature-cachapa .food-feature-order .button { background: #693b25; color: #fff7e5; }
-.food-feature-cachapa .food-feature-controls button { background: transparent; border-color: #724f3773; color: #493224; }
-.food-feature-cachapa .food-feature-transport button:hover:not(:disabled) { background: #693b2519; }
-.food-feature-cachapa .food-feature-dots span { background: #83512e58; }
-.food-feature-cachapa .food-feature-dots span::after { background: #764622; }
+.portal .food-feature :is(button,a):focus-visible { outline-color: #ffcf68; }
 
 @keyframes feature-caption-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes feature-photo-drift { to { transform: scale(1.045); } }
 @keyframes feature-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 @media(max-width: 760px), (max-aspect-ratio: 5/4) {
-  .food-feature-lunch .food-feature-layout {
+  .food-feature-layout {
     min-height: max(32rem, calc(100svh - var(--storefront-header-height)));
     padding-top: clamp(12rem, 34svh, 24rem);
     padding-bottom: 1rem;
   }
-  .food-feature-lunch .food-feature-copy { max-width: min(100%, 32rem); }
-  .food-feature-lunch .food-feature-image { bottom: auto; height: 86%; }
+  .food-feature-copy { max-width: min(100%, 32rem); }
+  .food-feature-image { bottom: auto; height: 86%; }
   .food-feature-background { mask-image: linear-gradient(0deg, #000, transparent 68%); }
-  .food-feature-lunch picture img { object-position: center 38%; }
-  .food-feature-lunch picture.is-active img { transform-origin: center 38%; }
-  .food-feature-lunch::after {
+  .food-feature-image picture img { object-position: center 38%; }
+  .food-feature-image picture.is-active img { transform-origin: center 38%; }
+  .food-feature::after {
     background: linear-gradient(0deg, #3e2118 7%, #3e2118f7 15%, #2b150ec4 35%, #2b150e30 60%, transparent 75%);
   }
-  .food-feature-lunch .food-feature-copy h1 { font-size: clamp(3.8rem, 14vw, 7.1rem); text-wrap: wrap; }
+  .food-feature-copy h1 { font-size: clamp(3.35rem, 14vw, 7.1rem); text-wrap: wrap; }
 }
 @media(max-width: 760px) {
   .food-feature-category { margin-bottom: .6rem; }
-  .food-feature-caption p { margin-top: .65rem; }
+  .food-feature-caption h1 + p { margin-top: .65rem; }
   .food-feature-order { margin-top: .85rem; }
   .food-feature-controls { margin-top: .7rem; }
-  .food-feature-cachapa .food-feature-image { position: relative; inset: auto; aspect-ratio: 1.25; }
-  .food-feature-cachapa .food-feature-layout { display: block; min-height: 0; padding-block: 1.7rem 2rem; }
-  .food-feature-cachapa .food-feature-caption h2 { font-size: clamp(3rem, 10vw, 4.9rem); }
 }
 @media(prefers-reduced-motion: reduce) {
   .food-feature-image picture, .food-feature-image picture.is-active, .food-feature-controls button { transition: none; }
-  .food-feature-caption, .food-feature-lunch picture.is-active img,
+  .food-feature-caption, .food-feature-image picture.is-active img,
   .food-feature-dots button[aria-pressed=true] span.is-advancing::after { animation: none; }
 }

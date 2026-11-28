@@ -35,13 +35,11 @@ export default function Portal() {
       </div>
     </header>
     <main>
-      {(['lunch','cachapa'] as const).map(group => {
-        const category = group === 'lunch' ? 'Almuerzos' : 'Cachapas';
-        return <FeaturedDishes key={group} group={group} category={category} products={catalog.products} background={group === 'lunch' ? business.hero_url : undefined}
-          ordering={business.accepting_orders && !catalog.loading && !catalog.error}
-          onOrder={product => store.current?.orderFeatured(product)}
-          onBrowse={() => store.current?.browseCategory(catalog.categories.find(item => item.name.toLocaleLowerCase('es') === category.toLocaleLowerCase('es'))?.id ?? '')}/>;
-      })}
+      <FeaturedDishes products={catalog.products} background={business.hero_url}
+        ordering={business.accepting_orders && !catalog.loading && !catalog.error}
+        onOrder={product => store.current?.orderFeatured(product)}
+        onBrowse={(category,categoryId) => store.current?.browseCategory(categoryId ?? catalog.categories.find(item =>
+          item.name.trim().toLocaleLowerCase('es') === category.toLocaleLowerCase('es'))?.id ?? '')}/>
       <div className="portal-order-status">
         <div className="shell">
           <p><span className={business.accepting_orders ? 'open' : ''} aria-hidden="true"/>{business.accepting_orders ? 'Pedidos en línea abiertos' : 'Pedidos en línea cerrados'}</p>
